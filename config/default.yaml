@@ -38,3 +38,93 @@ columns:
   quantity_keywords: ["qty", "quantity"]
   rate_keywords: ["rate", "unit rate", "price"]
   amount_keywords: ["amount", "total", "sum"]
+tender_analysis:
+  supported_suffixes: [".txt", ".md", ".csv", ".xlsx", ".xlsm"]
+  confidence_thresholds:
+    high: 85
+    medium: 70
+    low: 55
+  default_owner: Estimator
+  review_status: pending review
+  summary_sheet_names:
+    - summary
+    - tender summary
+    - abstract
+  requirement_categories:
+    submission_documents:
+      owner: Estimator
+      phrases:
+        - "certified copy"
+        - "tax compliance"
+        - "company registration"
+        - "cr12"
+        - "audited accounts"
+        - "power of attorney"
+        - "form of tender"
+    securities:
+      owner: Commercial Manager
+      phrases:
+        - "bid bond"
+        - "tender security"
+        - "performance security"
+        - "bank guarantee"
+    meetings:
+      owner: Estimator
+      phrases:
+        - "site visit"
+        - "pre bid"
+        - "pre-bid"
+        - "clarification meeting"
+    periods:
+      owner: Planner
+      phrases:
+        - "completion period"
+        - "contract period"
+        - "delivery period"
+        - "bid validity"
+        - "tender validity"
+    pricing_instructions:
+      owner: QS
+      phrases:
+        - "provisional sum"
+        - "provisional sums"
+        - "dayworks"
+        - "special pricing"
+        - "priced boq"
+        - "schedule of rates"
+    technical_compliance:
+      owner: Technical Lead
+      phrases:
+        - "method statement"
+        - "technical proposal"
+        - "compliance"
+        - "brochure"
+        - "datasheet"
+  scope_section_keywords:
+    preliminaries: ["preliminaries", "general items", "general requirements"]
+    earthworks: ["earthworks", "excavation", "fill", "backfill", "cut to spoil"]
+    concrete: ["concrete", "reinforcement", "formwork"]
+    finishes: ["finishes", "plaster", "paint", "tiling", "screed"]
+    plumbing: ["plumbing", "water supply", "sanitary", "pipework"]
+    drainage: ["drainage", "stormwater", "manhole", "sewer"]
+    electrical: ["electrical", "lighting", "power", "cabling"]
+    external_works: ["external works", "paving", "fencing", "landscaping"]
+    dayworks: ["dayworks", "labour rates", "plant rates"]
+    contractors_equipment: ["contractor's equipment", "contractors equipment", "plant hire", "plant"]
+    provisional_items: ["provisional", "provisional sum", "contingency"]
+  clarification_keywords:
+    unclear_scope: ["where indicated", "as directed", "as required", "if necessary", "if any"]
+    missing_measurements: ["to be measured", "remeasurement", "provisional", "tbd", "to be confirmed"]
+    conflicting_instructions: ["however", "alternatively", "either", "or approved equivalent"]
+    unusual_requirements: ["bid bond", "performance security", "method statement", "site visit"]
+  draft_units:
+    preliminaries: sum
+    dayworks: day
+    contractors_equipment: day
+    provisional_items: sum
+tender_to_price:
+  worksheet_names:
+    handoff: Pricing Handoff
+  include_gap_findings_in_handoff: true
+  price_tender_only_handoff: true
+  preserve_existing_boq_pricing: true

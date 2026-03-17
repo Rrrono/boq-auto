@@ -7,7 +7,7 @@ import argparse
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
-    parser = argparse.ArgumentParser(prog="python -m src.main", description="BOQ AUTO pricing engine")
+    parser = argparse.ArgumentParser(prog="python -m src.main", description="BOQ AUTO pricing and tender analysis")
     parser.add_argument("--config", help="Path to YAML or JSON config file")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -75,5 +75,41 @@ def build_parser() -> argparse.ArgumentParser:
     promote = subparsers.add_parser("promote-approved", help="Promote approved reviewed candidates into live sheets")
     promote.add_argument("--db", required=True, help="Path to database workbook")
     promote.add_argument("--json", help="Optional training log JSON output")
+
+    analyze_tender = subparsers.add_parser("analyze-tender", help="Analyze a tender text input and generate a review workbook")
+    analyze_tender.add_argument("--input", required=True, help="Path to local tender text, CSV, or Excel input")
+    analyze_tender.add_argument("--out", required=True, help="Output workbook path")
+    analyze_tender.add_argument("--json", help="Optional JSON analysis export path")
+    analyze_tender.add_argument("--title", help="Optional tender title override")
+
+    tender_checklist = subparsers.add_parser("tender-checklist", help="Generate a tender checklist workbook from a tender input")
+    tender_checklist.add_argument("--input", required=True, help="Path to local tender text, CSV, or Excel input")
+    tender_checklist.add_argument("--out", required=True, help="Output workbook path")
+    tender_checklist.add_argument("--json", help="Optional JSON analysis export path")
+    tender_checklist.add_argument("--title", help="Optional tender title override")
+
+    gap_check = subparsers.add_parser("gap-check", help="Compare tender scope against an optional BOQ and produce a review-first gap report")
+    gap_check.add_argument("--input", required=True, help="Path to local tender text, CSV, or Excel input")
+    gap_check.add_argument("--out", required=True, help="Output workbook path")
+    gap_check.add_argument("--boq", help="Optional BOQ workbook to compare against the tender scope")
+    gap_check.add_argument("--json", help="Optional JSON analysis export path")
+    gap_check.add_argument("--title", help="Optional tender title override")
+
+    draft_boq = subparsers.add_parser("draft-boq", help="Generate draft BOQ suggestions from tender text")
+    draft_boq.add_argument("--input", required=True, help="Path to local tender text, CSV, or Excel input")
+    draft_boq.add_argument("--out", required=True, help="Output workbook path")
+    draft_boq.add_argument("--json", help="Optional JSON analysis export path")
+    draft_boq.add_argument("--title", help="Optional tender title override")
+
+    tender_price = subparsers.add_parser("tender-price", help="Run the integrated tender-analysis to pricing workflow")
+    tender_price.add_argument("--input", required=True, help="Path to local tender text, CSV, or Excel input")
+    tender_price.add_argument("--db", required=True, help="Path to database workbook")
+    tender_price.add_argument("--out", required=True, help="Output workbook path")
+    tender_price.add_argument("--boq", help="Optional BOQ workbook to price and compare against")
+    tender_price.add_argument("--json", help="Optional integrated JSON export path")
+    tender_price.add_argument("--region", help="Region preference")
+    tender_price.add_argument("--threshold", type=float, help="Matching threshold")
+    tender_price.add_argument("--apply", action="store_true", help="Write rates back into priced sheets")
+    tender_price.add_argument("--title", help="Optional tender title override")
 
     return parser

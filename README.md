@@ -13,6 +13,7 @@ Local Python application for pricing Kenyan construction BOQs from an Excel-base
 - Supports batch processing, database validation, unmatched export, and audit JSON output
 - Produces commercial quotation outputs including section totals, markups, VAT, assumptions, exclusions, basis-of-rate reporting, and commercial review sheets
 - Supports estimator learning through Candidate Review sheets, approved/rejected review workflows, promotions into `Aliases` and `RateLibrary`, and training-log JSON exports
+- Includes Tender Analysis v1 for tender text review, requirement extraction, submission checklist generation, scope parsing, and tender-analysis summary output
 - Works locally on Windows with Python 3.11+
 
 ## Windows Setup
@@ -36,6 +37,7 @@ Project overview:
 
 - [docs/project_overview.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/project_overview.md)
 - [docs/workflows.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/workflows.md)
+- Demo tender inputs: [tender](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/tender)
 
 ## First Run
 
@@ -63,6 +65,36 @@ Price the demo BOQ:
 py -3.11 -m src.main price --db database\qs_database.xlsx --boq boq\demo_boq.xlsx --out output\priced_demo.xlsx --apply --region Nyanza --threshold 78
 ```
 
+Run Tender Analysis v1 on the demo tender text:
+
+```powershell
+py -3.11 -m src.main analyze-tender --input tender\demo_tender_notice.txt --out output\tender_analysis_demo.xlsx --json output\tender_analysis_demo.json
+```
+
+Generate the checklist-focused tender workbook:
+
+```powershell
+py -3.11 -m src.main tender-checklist --input tender\demo_tender_notice.txt --out output\tender_checklist_demo.xlsx
+```
+
+Generate a draft BOQ suggestion workbook from tender text:
+
+```powershell
+py -3.11 -m src.main draft-boq --input tender\demo_tender_scope_only.txt --out output\draft_boq_demo.xlsx --json output\draft_boq_demo.json
+```
+
+Run a tender-vs-BOQ gap check:
+
+```powershell
+py -3.11 -m src.main gap-check --input tender\demo_tender_notice.txt --boq boq\demo_boq.xlsx --out output\gap_check_demo.xlsx --json output\gap_check_demo.json
+```
+
+Run the integrated tender-to-pricing workflow:
+
+```powershell
+py -3.11 -m src.main tender-price --input tender\demo_tender_notice.txt --db database\qs_database.xlsx --boq boq\demo_boq.xlsx --out output\tender_priced_demo.xlsx --apply --region Nyanza --threshold 78 --json output\tender_priced_demo.json
+```
+
 ## Batch Pricing
 
 The priced workbook now includes these additional quotation sheets:
@@ -82,6 +114,88 @@ py -3.11 -m src.main export-unmatched --input output\priced_demo.xlsx --csv outp
 
 ```powershell
 py -3.11 -m src.main batch --db database\qs_database.xlsx --boq-dir boq --out-dir output --apply --region Nyanza
+```
+
+## Tender Analysis
+
+Tender Analysis v1 is for early tender review before BOQ gap checking and pricing. It reads local tender text, extracts likely requirements, builds a submission checklist, parses likely scope sections, and writes a review-first workbook with:
+
+- `Tender Analysis Summary`
+- `Tender Checklist`
+- `Scope Summary`
+- `Extracted Requirements`
+
+Run the demo input:
+
+```powershell
+py -3.11 -m src.main analyze-tender --input tender\demo_tender_notice.txt --out output\tender_analysis_demo.xlsx --json output\tender_analysis_demo.json
+```
+
+Run against a normalized extracted tender text file:
+
+```powershell
+py -3.11 -m src.main analyze-tender --input tender\my_tender_text.txt --out output\my_tender_analysis.xlsx
+```
+
+Run against a structured CSV or Excel-derived text export:
+
+```powershell
+py -3.11 -m src.main analyze-tender --input tender\my_tender_schedule.xlsx --out output\my_tender_schedule_analysis.xlsx
+```
+
+Checklist-focused command path:
+
+```powershell
+py -3.11 -m src.main tender-checklist --input tender\demo_tender_notice.txt --out output\tender_checklist_demo.xlsx
+```
+
+## Tender Analysis v2
+
+Tender Analysis v2 extends the same workflow with:
+
+- `BOQ Gap Report`
+- `Draft BOQ Suggestions`
+- `Clarification Log`
+
+Generate draft BOQ suggestions without fabricating quantities:
+
+```powershell
+py -3.11 -m src.main draft-boq --input tender\demo_tender_scope_only.txt --out output\draft_boq_demo.xlsx --json output\draft_boq_demo.json
+```
+
+Compare tender scope against a BOQ workbook:
+
+```powershell
+py -3.11 -m src.main gap-check --input tender\demo_tender_notice.txt --boq boq\demo_boq.xlsx --out output\gap_check_demo.xlsx --json output\gap_check_demo.json
+```
+
+Run a review-only gap check when no BOQ has been issued yet:
+
+```powershell
+py -3.11 -m src.main gap-check --input tender\demo_tender_scope_only.txt --out output\gap_check_review_only.xlsx
+```
+
+## Tender To Pricing
+
+The integrated `tender-price` workflow reuses the existing tender-analysis modules and the existing pricing engine in one review-first path. It:
+
+- analyzes the tender
+- runs BOQ gap checking
+- generates draft BOQ suggestions
+- builds a `Pricing Handoff`
+- prices either the supplied BOQ or the tender-only handoff workbook
+- writes one integrated workbook with tender review sheets plus pricing/commercial output sheets
+
+Tender only:
+
+```powershell
+py -3.11 -m src.main tender-price --input tender\demo_tender_scope_only.txt --db database\qs_database.xlsx --out output\tender_only_priced.xlsx --region Nyanza --threshold 78 --json output\tender_only_priced.json
+```
+
+Tender plus BOQ:
+
+```powershell
+py -3.11 -m src.main tender-price --input tender\demo_tender_notice.txt --db database\qs_database.xlsx --boq boq\demo_boq.xlsx --out output\tender_priced_demo.xlsx --apply --region Nyanza --threshold 78 --json output\tender_priced_demo.json
 ```
 
 ## Review Cycle
@@ -142,6 +256,18 @@ Run tests:
 py -3.11 -m pytest
 ```
 
+Tender analysis tests:
+
+```powershell
+py -3.11 -m pytest tests\test_tender_analysis.py
+```
+
+Tender-to-price tests:
+
+```powershell
+py -3.11 -m pytest tests\test_tender_to_price.py
+```
+
 Equivalent CLI commands are also available through `python -m src.main`:
 
 ```powershell
@@ -165,3 +291,6 @@ py -3.11 -m src.main promote-approved --db database\qs_database.xlsx --json outp
 - The ingestion subsystem uses `CandidateMatches` for uncertain imports and writes approved merges into `ReviewLog`.
 - The estimator learning loop uses `Candidate Review` as the editable team worksheet, then syncs decisions back into `CandidateMatches`, `Aliases`, `RateLibrary`, and timestamped `ReviewLog` entries.
 - Additional step-by-step ingestion notes are in [docs/workflows.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/workflows.md).
+- Tender Analysis is review-first. Low-confidence extractions and ambiguous instructions should still be checked by the estimator or QS before hand-off into BOQ gap review and pricing.
+- Draft BOQ generation does not fabricate quantities. It only creates sectioned item suggestions, units, placeholders, source basis, and confidence for review.
+- The integrated `tender-price` flow also keeps tender-drafted rows and gap-derived rows explicitly flagged in `Pricing Handoff`; missing measurements remain for human review.

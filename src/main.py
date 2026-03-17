@@ -21,13 +21,19 @@ from .ingestion import (
     promote_approved_candidates,
 )
 from .logger import setup_logging
+from .tender_to_price import TenderToPriceRunner
+from .tender_workflow import TenderWorkflow
 
 
-def _build_engine(args: Namespace) -> tuple:
+def _build_runtime(args: Namespace) -> tuple:
     config = load_config(args.config)
     config = merge_cli_overrides(config, {"processing.apply_rates": getattr(args, "apply", None) or None})
     logger = setup_logging(config.log_level, config.log_file)
-    return config, logger, PricingEngine(config, logger)
+    return config, logger
+
+
+def _build_engine(config, logger) -> PricingEngine:
+    return PricingEngine(config, logger)
 
 
 def _handle_price(engine: PricingEngine, logger, args: Namespace) -> int:
@@ -101,17 +107,95 @@ def _handle_import(logger, args: Namespace) -> int:
     return 0
 
 
+def _handle_tender(workflow: TenderWorkflow, logger, args: Namespace, checklist_only: bool = False) -> int:
+    runner = workflow.generate_checklist if checklist_only else workflow.analyze
+    result = runner(
+        input_path=args.input,
+        output_path=args.out,
+        json_path=args.json,
+        title_override=args.title,
+    )
+    logger.info(
+        "Tender analysis complete for %s: requirements=%s scope_sections=%s workbook=%s",
+        result.document.document_name,
+        len(result.requirements),
+        len(result.scope_sections),
+        result.output_workbook,
+    )
+    return 0
+
+
+def _handle_gap_check(workflow: TenderWorkflow, logger, args: Namespace) -> int:
+    result = workflow.gap_check(
+        input_path=args.input,
+        output_path=args.out,
+        boq_path=args.boq,
+        json_path=args.json,
+        title_override=args.title,
+    )
+    logger.info(
+        "Gap check complete for %s: gap_items=%s clarifications=%s workbook=%s",
+        result.document.document_name,
+        len(result.gap_items),
+        len(result.clarifications),
+        result.output_workbook,
+    )
+    return 0
+
+
+def _handle_draft_boq(workflow: TenderWorkflow, logger, args: Namespace) -> int:
+    result = workflow.draft_boq(
+        input_path=args.input,
+        output_path=args.out,
+        json_path=args.json,
+        title_override=args.title,
+    )
+    logger.info(
+        "Draft BOQ generation complete for %s: suggestions=%s clarifications=%s workbook=%s",
+        result.document.document_name,
+        len(result.draft_suggestions),
+        len(result.clarifications),
+        result.output_workbook,
+    )
+    return 0
+
+
+def _handle_tender_price(config, logger, args: Namespace) -> int:
+    runner = TenderToPriceRunner(config, logger)
+    artifacts = runner.run(
+        input_path=args.input,
+        db_path=args.db,
+        output_path=args.out,
+        boq_path=args.boq,
+        region=args.region,
+        threshold=args.threshold,
+        apply_rates=args.apply,
+        title_override=args.title,
+        json_path=args.json,
+    )
+    logger.info(
+        "Tender-price complete: workbook=%s handoff_rows=%s priced_items=%s",
+        artifacts.output_workbook,
+        len(artifacts.pricing_handoff_rows),
+        artifacts.pricing_artifacts.processed if artifacts.pricing_artifacts else 0,
+    )
+    return 0
+
+
 def main() -> int:
     """CLI entry point."""
     parser = build_parser()
     args = parser.parse_args()
-    _, logger, engine = _build_engine(args)
+    config, logger = _build_runtime(args)
 
     if args.command == "price":
+        engine = _build_engine(config, logger)
         return _handle_price(engine, logger, args)
     if args.command == "batch":
+        engine = _build_engine(config, logger)
         return _handle_batch(engine, logger, args)
     if args.command == "validate-db":
+        engine = _build_engine(config, logger)
         return _handle_validate(engine, logger, args)
     if args.command == "export-unmatched":
         output = export_unmatched_from_workbook(args.input, args.csv)
@@ -143,6 +227,20 @@ def main() -> int:
         summary = promote_approved_candidates(args.db, args.json)
         logger.info("Promoted %s approved reviewed row(s).", summary.promoted)
         return 0
+    if args.command == "analyze-tender":
+        workflow = TenderWorkflow(config, logger)
+        return _handle_tender(workflow, logger, args)
+    if args.command == "tender-checklist":
+        workflow = TenderWorkflow(config, logger)
+        return _handle_tender(workflow, logger, args, checklist_only=True)
+    if args.command == "gap-check":
+        workflow = TenderWorkflow(config, logger)
+        return _handle_gap_check(workflow, logger, args)
+    if args.command == "draft-boq":
+        workflow = TenderWorkflow(config, logger)
+        return _handle_draft_boq(workflow, logger, args)
+    if args.command == "tender-price":
+        return _handle_tender_price(config, logger, args)
 
     parser.print_help()
     return 1
