@@ -1,0 +1,40 @@
+app:
+  log_level: INFO
+  log_file: logs/boq_auto.log
+  default_region: Nairobi
+  default_currency: KES
+paths:
+  boq_dir: boq
+  database_dir: database
+  output_dir: output
+matching:
+  threshold: 78
+  review_threshold: 65
+  strong_threshold: 88
+  region_bonus: 4
+  section_bonus: 8
+  unit_bonus: 6
+  alias_bonus: 5
+  unit_penalty: 18
+processing:
+  apply_rates: false
+  write_amount_formulas: true
+  add_comments: false
+  preserve_formulas: true
+  create_suggestions_sheet: true
+  export_unmatched_csv: true
+  export_audit_json: true
+  max_header_scan_rows: 20
+commercial:
+  overheads_pct: 8.0
+  profit_pct: 5.0
+  risk_pct: 3.0
+  vat_pct: 16.0
+  default_approval_status: Pending Commercial Review
+  bid_ready_requires_zero_flags: true
+columns:
+  description_keywords: ["description", "item description", "particulars", "particular", "work description"]
+  unit_keywords: ["unit", "uom"]
+  quantity_keywords: ["qty", "quantity"]
+  rate_keywords: ["rate", "unit rate", "price"]
+  amount_keywords: ["amount", "total", "sum"]

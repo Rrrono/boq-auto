@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+*.log
+output/*.xlsx
+output/*.csv
+output/*.json
+database/*.xlsx
+boq/*.xlsx
+Microsoft/

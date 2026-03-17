@@ -1,0 +1,3 @@
+item_code,description,section,subsection,unit,rate,currency,region,source,source_sheet,source_page,basis,crew_type,plant_type,material_type,keywords,alias_group,build_up_recipe_id,confidence_hint,notes,active
+IMP001,Imported cement supply,Materials,Cement,bag,850,KES,Nyanza,Manual Export,Sheet1,12,Reviewed supplier quotation,,,cement,"cement bag supplier",cement,,2,Initial import,true
+IMP002,Imported casual labour general,Dayworks,Labour,day,1800,KES,Nairobi,Manual Export,Sheet1,13,Reviewed wage schedule,labour,,,casual labour,, ,1,Initial import,true
