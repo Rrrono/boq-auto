@@ -87,6 +87,7 @@ class DraftBOQSuggestion:
     source_basis: str
     source_reference: str
     confidence: float
+    source_excerpt: str = ""
     review_flag: bool = True
     notes: str = ""
 

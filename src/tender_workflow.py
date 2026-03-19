@@ -18,26 +18,13 @@ from .scope_parser import ScopeParser
 from .tender_models import TenderAnalysisResult, TenderAnalysisSummary
 from .tender_reader import read_tender_document
 from .utils import dump_json, ensure_parent
-
-
-def _autosize_columns(worksheet) -> None:
-    for column_cells in worksheet.columns:
-        max_length = 0
-        column_letter = column_cells[0].column_letter
-        for cell in column_cells:
-            if cell.value is None:
-                continue
-            max_length = max(max_length, len(str(cell.value)))
-        worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 14), 48)
+from .workbook_writer import format_worksheet
 
 
 def _append_table(worksheet, headers: list[str], rows: list[list[object]]) -> None:
     worksheet.append(headers)
     for row in rows:
         worksheet.append(row)
-    worksheet.freeze_panes = "A2"
-    worksheet.auto_filter.ref = worksheet.dimensions
-    _autosize_columns(worksheet)
 
 
 class TenderWorkflow:
@@ -85,7 +72,7 @@ class TenderWorkflow:
     ) -> TenderAnalysisResult:
         """Build tender analysis results in memory for downstream workflows."""
 
-        document = read_tender_document(input_path, self.logger)
+        document = read_tender_document(input_path, self.logger, self.config)
         if title_override:
             document.title = title_override
         requirements = self.extractor.extract(document)
@@ -237,7 +224,7 @@ class TenderWorkflow:
             ["Review Notes", " | ".join(summary.review_notes)],
         ]:
             summary_sheet.append(row)
-        _autosize_columns(summary_sheet)
+        format_worksheet(summary_sheet, "tender_analysis")
 
         checklist_sheet = workbook.create_sheet("Tender Checklist")
         _append_table(
@@ -270,6 +257,7 @@ class TenderWorkflow:
                 for item in checklist_items
             ],
         )
+        format_worksheet(checklist_sheet, "table")
 
         scope_sheet = workbook.create_sheet("Scope Summary")
         _append_table(
@@ -286,6 +274,7 @@ class TenderWorkflow:
                 for section in scope_sections
             ],
         )
+        format_worksheet(scope_sheet, "table")
 
         draft_sheet = workbook.create_sheet("Draft BOQ Suggestions")
         _append_table(
@@ -299,8 +288,9 @@ class TenderWorkflow:
                 "amount_placeholder",
                 "source_basis",
                 "source_reference",
+                "source_excerpt",
                 "confidence",
-                "review_flag",
+                "review_required",
                 "notes",
             ],
             [
@@ -313,6 +303,7 @@ class TenderWorkflow:
                     item.amount_placeholder,
                     item.source_basis,
                     item.source_reference,
+                    item.source_excerpt,
                     round(item.confidence, 1),
                     "Yes" if item.review_flag else "No",
                     item.notes,
@@ -320,6 +311,7 @@ class TenderWorkflow:
                 for item in draft_suggestions
             ],
         )
+        format_worksheet(draft_sheet, "draft_boq")
 
         gap_sheet = workbook.create_sheet("BOQ Gap Report")
         _append_table(
@@ -348,6 +340,7 @@ class TenderWorkflow:
                 for item in gap_items
             ],
         )
+        format_worksheet(gap_sheet, "gap_report")
 
         clarification_sheet = workbook.create_sheet("Clarification Log")
         _append_table(
@@ -376,6 +369,7 @@ class TenderWorkflow:
                 for item in clarifications
             ],
         )
+        format_worksheet(clarification_sheet, "table")
 
         requirements_sheet = workbook.create_sheet("Extracted Requirements")
         _append_table(
@@ -408,6 +402,7 @@ class TenderWorkflow:
                 for requirement in requirements
             ],
         )
+        format_worksheet(requirements_sheet, "table")
 
     def _write_json(self, output_path: Path, result: TenderAnalysisResult) -> None:
         payload = {

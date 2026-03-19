@@ -7,9 +7,12 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+from .ai.embedding_provider import HashEmbeddingProvider, OpenAIEmbeddingProvider
 from .audit import export_unmatched_csv, write_audit_json
 from .buildup import price_build_up_recipe
 from .commercial import resolve_commercial_terms, resolve_regional_factor, summarize_quote
+from .cost_schema import CostDatabase, schema_database_path
+from .matching_engine import MatchingEngine
 from .matcher import Matcher, MatchingWeights
 from .models import (
     AliasEntry,
@@ -84,6 +87,7 @@ class PricingEngine:
         threshold: float | None = None,
         apply_rates: bool | None = None,
         column_overrides: dict[str, int] | None = None,
+        matching_mode: str = "rule",
     ) -> RunArtifacts:
         """Price a BOQ workbook and write outputs."""
         bundle = self.load_database(db_path)
@@ -99,7 +103,21 @@ class PricingEngine:
             alias_bonus=float(self.config.get("matching.alias_bonus", 5)),
             unit_penalty=float(self.config.get("matching.unit_penalty", 18)),
         )
-        matcher = Matcher(bundle.rate_items, bundle.aliases, weights)
+        embedding_lookup = self._load_embedding_lookup(db_path) if matching_mode in {"ai", "hybrid"} else {}
+        matching_engine = MatchingEngine(
+            mode=matching_mode,
+            aliases=bundle.aliases,
+            embedding_provider=self._embedding_provider(matching_mode),
+            embedding_lookup=embedding_lookup,
+            hybrid_ai_weight=float(self.config.get("matching.hybrid_ai_weight", 25)),
+            hybrid_weights={
+                "semantic": float(self.config.get("matching.hybrid_weights.semantic", 0.45)),
+                "alias": float(self.config.get("matching.hybrid_weights.alias", 0.20)),
+                "unit": float(self.config.get("matching.hybrid_weights.unit", 0.15)),
+                "keyword": float(self.config.get("matching.hybrid_weights.keyword", 0.20)),
+            },
+        )
+        matcher = Matcher(bundle.rate_items, bundle.aliases, weights, matching_mode=matching_mode, matching_engine=matching_engine)
         reader = WorkbookReader(self.config, self.logger)
         writer = WorkbookWriter()
 
@@ -183,6 +201,7 @@ class PricingEngine:
                     "db_path": db_path,
                     "boq_path": boq_path,
                     "region": region_value,
+                    "matching_mode": matching_mode,
                     "commercial_terms": commercial_terms,
                     "quotation_summary": quotation_summary,
                 },
@@ -199,6 +218,29 @@ class PricingEngine:
             flagged=flagged,
             quotation_summary=quotation_summary,
         )
+
+    def _load_embedding_lookup(self, db_path: str) -> dict[str, list[float]]:
+        sidecar_path = schema_database_path(db_path)
+        if not sidecar_path.exists():
+            return {}
+        try:
+            repository = CostDatabase(sidecar_path)
+            return repository.fetch_embedding_lookup()
+        except Exception:
+            self.logger.exception("Failed to load item embeddings from %s", sidecar_path)
+            return {}
+
+    def _embedding_provider(self, matching_mode: str):
+        if matching_mode not in {"ai", "hybrid"}:
+            return None
+        provider_name = str(self.config.get("ai.provider", "disabled")).strip().lower()
+        if provider_name == "openai":
+            provider = OpenAIEmbeddingProvider(model=str(self.config.get("ai.embedding_model", "text-embedding-3-small")))
+            if provider.available():
+                return provider
+        if bool(self.config.get("ai.enable_hash_fallback", True)):
+            return HashEmbeddingProvider()
+        return None
 
     def validate_database(self, db_path: str) -> list[str]:
         """Validate workbook sheets and minimum required columns."""

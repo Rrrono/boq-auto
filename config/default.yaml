@@ -8,6 +8,7 @@ paths:
   database_dir: database
   output_dir: output
 matching:
+  mode: rule
   threshold: 78
   review_threshold: 65
   strong_threshold: 88
@@ -16,6 +17,18 @@ matching:
   unit_bonus: 6
   alias_bonus: 5
   unit_penalty: 18
+  hybrid_ai_weight: 25
+  hybrid_weights:
+    semantic: 0.45
+    alias: 0.20
+    unit: 0.15
+    keyword: 0.20
+ai:
+  enabled: false
+  provider: disabled
+  embedding_model: text-embedding-3-small
+  enable_hash_fallback: true
+  admin_ingestion_assist: false
 processing:
   apply_rates: false
   write_amount_formulas: true
@@ -39,7 +52,7 @@ columns:
   rate_keywords: ["rate", "unit rate", "price"]
   amount_keywords: ["amount", "total", "sum"]
 tender_analysis:
-  supported_suffixes: [".txt", ".md", ".csv", ".xlsx", ".xlsm"]
+  supported_suffixes: [".txt", ".md", ".csv", ".xlsx", ".xlsm", ".pdf"]
   confidence_thresholds:
     high: 85
     medium: 70
@@ -128,3 +141,17 @@ tender_to_price:
   include_gap_findings_in_handoff: true
   price_tender_only_handoff: true
   preserve_existing_boq_pricing: true
+database_release:
+  master_database_path: database/master/qs_database_master.xlsx
+  production_database_path: database/qs_database.xlsx
+  release_dir: database/releases
+  metadata_path: database/releases/releases.json
+  current_pointer_path: database/releases/current_release.json
+  audit_log_path: logs/release_audit.jsonl
+ui:
+  app_mode: production
+  work_root: output/ui_runs
+  workspace_root: workspace/jobs
+  log_preview_lines: 80
+  default_database_path: database/qs_database.xlsx
+tesseract_path: "C:/Program Files/Tesseract-OCR/tesseract.exe"

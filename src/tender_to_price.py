@@ -16,6 +16,7 @@ from .tender_models import PricingHandoffRow, TenderAnalysisResult
 from .tender_workflow import TenderWorkflow
 from .utils import dump_json, ensure_parent
 from .workbook_reader import WorkbookReader
+from .workbook_writer import format_worksheet
 
 
 @dataclass(slots=True)
@@ -59,6 +60,7 @@ class TenderToPriceRunner:
         apply_rates: bool = False,
         title_override: str | None = None,
         json_path: str | None = None,
+        matching_mode: str = "rule",
     ) -> TenderToPriceArtifacts:
         """Run the integrated tender-to-price workflow."""
 
@@ -80,6 +82,7 @@ class TenderToPriceRunner:
                 region=region,
                 threshold=threshold,
                 apply_rates=apply_rates,
+                matching_mode=matching_mode,
             )
             self._write_pricing_handoff_sheet(pricing_artifacts.output_workbook, handoff_rows)
             final_workbook = pricing_artifacts.output_workbook
@@ -94,6 +97,7 @@ class TenderToPriceRunner:
                 region=region,
                 threshold=threshold,
                 apply_rates=apply_rates,
+                matching_mode=matching_mode,
             )
             final_workbook = pricing_artifacts.output_workbook
 
@@ -242,6 +246,7 @@ class TenderToPriceRunner:
                     row.source_reference,
                 ]
             )
+        format_worksheet(worksheet, "pricing_handoff")
         workbook.save(workbook_path)
         return workbook_path
 
@@ -281,6 +286,7 @@ class TenderToPriceRunner:
                     row.source_reference,
                 ]
             )
+        format_worksheet(worksheet, "pricing_handoff")
         workbook.save(workbook_path)
         return Path(workbook_path)
 

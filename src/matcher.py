@@ -8,6 +8,7 @@ from math import fabs
 from rapidfuzz import fuzz
 
 from .aliases import apply_aliases
+from .matching_engine import MatchingEngine
 from .models import AliasEntry, MatchResult, RateItem, BOQLine
 from .normalizer import normalize_unit
 
@@ -27,10 +28,19 @@ class MatchingWeights:
 class Matcher:
     """Perform section-aware and unit-aware fuzzy matching."""
 
-    def __init__(self, rate_items: list[RateItem], aliases: list[AliasEntry], weights: MatchingWeights) -> None:
+    def __init__(
+        self,
+        rate_items: list[RateItem],
+        aliases: list[AliasEntry],
+        weights: MatchingWeights,
+        matching_mode: str = "rule",
+        matching_engine: MatchingEngine | None = None,
+    ) -> None:
         self.rate_items = [item for item in rate_items if item.active]
         self.aliases = aliases
         self.weights = weights
+        self.matching_mode = matching_mode
+        self.matching_engine = matching_engine
 
     def match(self, line: BOQLine, region: str) -> MatchResult:
         """Return the best matching rate item for a BOQ line."""
@@ -40,6 +50,18 @@ class Matcher:
             entry.section_bias and line.inferred_section and entry.section_bias.lower() == line.inferred_section.lower()
             for entry in alias_hits
         )
+
+        external_scores: dict[str, tuple[float, list[str]]] = {}
+        if self.matching_mode in {"ai", "hybrid"} and self.matching_engine is not None:
+            for candidate in self.matching_engine.match(normalized_query, self.rate_items):
+                item_code = getattr(candidate.item, "item_code", "")
+                if item_code:
+                    external_scores[str(item_code)] = (candidate.score, list(candidate.rationale))
+        effective_mode = self.matching_mode
+        if effective_mode == "ai" and not external_scores:
+            effective_mode = "rule"
+        elif effective_mode == "hybrid" and not external_scores:
+            effective_mode = "rule"
 
         ranked: list[tuple[float, RateItem, list[str]]] = []
 
@@ -80,6 +102,16 @@ class Matcher:
             if alias_section_match:
                 score += self.weights.alias_bonus
                 rationale.append("alias-section-bonus")
+
+            external_score, external_rationale = external_scores.get(item.item_code, (0.0, []))
+            if effective_mode == "ai":
+                if not external_score:
+                    continue
+                score = external_score
+                rationale = list(external_rationale) or [f"ai={external_score:.1f}"]
+            elif effective_mode == "hybrid" and external_score:
+                score = external_score
+                rationale = list(external_rationale)
 
             score += item.confidence_hint
             if fabs(description_score - partial_score) > 20:

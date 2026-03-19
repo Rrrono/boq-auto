@@ -14,6 +14,8 @@ Local Python application for pricing Kenyan construction BOQs from an Excel-base
 - Produces commercial quotation outputs including section totals, markups, VAT, assumptions, exclusions, basis-of-rate reporting, and commercial review sheets
 - Supports estimator learning through Candidate Review sheets, approved/rejected review workflows, promotions into `Aliases` and `RateLibrary`, and training-log JSON exports
 - Includes Tender Analysis v1 for tender text review, requirement extraction, submission checklist generation, scope parsing, and tender-analysis summary output
+- Supports tender PDF ingestion with direct text extraction and OCR fallback for scanned PDFs
+- Generates synthesized review-first Draft BOQ Suggestions that consolidate measurable work instead of dumping raw tender clauses
 - Works locally on Windows with Python 3.11+
 
 ## Windows Setup
@@ -33,11 +35,180 @@ py -3.11 -m pip install --upgrade pip
 py -3.11 -m pip install -r requirements.txt
 ```
 
+If you want OCR fallback for scanned PDFs, install Tesseract OCR on Windows and confirm the executable path matches `config/default.yaml`:
+
+```yaml
+tesseract_path: "C:/Program Files/Tesseract-OCR/tesseract.exe"
+```
+
 Project overview:
 
 - [docs/project_overview.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/project_overview.md)
 - [docs/workflows.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/workflows.md)
 - Demo tender inputs: [tender](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/tender)
+
+## Streamlit Apps
+
+Run the staff-facing production app:
+
+```powershell
+py -3.11 -m streamlit run app.py
+```
+
+Run the private owner/admin app:
+
+```powershell
+py -3.11 -m streamlit run admin_app.py
+```
+
+Which app to use:
+
+- `app.py` is the production app for colleagues doing day-to-day tender review, workspace management, and pricing
+- `admin_app.py` is the private owner/admin app for training, database maintenance, review promotion, and release control
+
+Production app pages:
+
+- Home / Overview
+- Workspace / Jobs
+- Tender Analysis
+- BOQ Pricing
+- Tender -> Pricing
+- System / Logs
+
+Admin app pages:
+
+- Admin Home
+- Workspace / Jobs
+- Tender Analysis
+- BOQ Pricing
+- Tender -> Pricing
+- Manual Ingestion
+- Database Tools
+- Release Management
+- Admin / Logs
+
+The production app intentionally does not expose training/database mutation tools such as imports, normalization, deduplication, review promotion, or release controls.
+
+## Database Release Workflow
+
+The production app prices against a released database snapshot instead of the live training/master workbook.
+
+Configured release paths live in [config/default.yaml](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/config/default.yaml):
+
+- `database_release.master_database_path`
+- `database_release.release_dir`
+- `database_release.production_database_path`
+- `database_release.current_pointer_path`
+- `database_release.metadata_path`
+
+Typical release flow:
+
+1. Use `admin_app.py`
+2. Update and review the master/training database
+3. Open `Release Management`
+4. Create a new production release snapshot
+5. The snapshot is saved under `database/releases/` with a timestamped versioned name
+6. The current production pointer is updated without overwriting older snapshots
+7. The staff production app automatically uses the current released snapshot
+
+Release behavior:
+
+- creating a release copies the configured master database into `database/releases/`
+- older releases are kept; release creation does not silently overwrite prior snapshots
+- release metadata records who created the release and when
+- the admin app can reselect an earlier release later for rollback or comparison
+
+## Architecture Upgrade
+
+BOQ AUTO now keeps the existing Excel workflow for compatibility while adding a normalized cost-data sidecar schema for admin/training operations.
+
+Normalized schema:
+
+- `items`
+- `sources`
+- `aliases`
+- `ingestion_logs`
+- `item_embeddings`
+
+Practical behavior:
+
+- admin ingestion writes reviewed items into the existing Excel master database and into a SQLite sidecar schema
+- production pricing still reads the released Excel snapshot, so existing CLI and workbook outputs remain intact
+- when a release snapshot is created, the matching SQLite sidecar is copied alongside the Excel release if present
+
+Matching modes:
+
+- `rule` keeps the existing fuzzy/rule-based behavior and remains the default
+- `hybrid` uses a weighted score across semantic similarity, alias hits, unit similarity, and keyword overlap
+- `ai` relies on embeddings and falls back safely when no provider/API key is available
+
+Admin controls:
+
+- `Manual Ingestion` in the admin app handles reviewed PDF ingestion into the master database
+- structured ingestion now keeps trade/category, material, unit, and keywords in the normalized schema
+- optional admin-only AI assistance can suggest aliases and categories during ingestion
+- admin users can generate embeddings for the normalized schema database
+- embeddings are generated from `trade | material | description | unit`
+- admin users can review ingestion logs from the schema sidecar
+- admin users can log match feedback for future tuning from pricing UI previews
+
+## Workspace Jobs
+
+The Streamlit UI now supports persistent workspace jobs so colleagues do not need to keep downloading and re-uploading the same tender, BOQ, and output files between steps.
+
+Each job is stored under:
+
+```text
+workspace/jobs/<job_id>/
+```
+
+Each job folder contains:
+
+- `inputs/` for saved tender, BOQ, and database files
+- `intermediate/` for handoff-style working files
+- `outputs/` for workbooks, JSON files, CSVs, and other generated artifacts
+- `logs/` for lightweight per-job logs
+- `state.json` for job metadata, operator attribution, step statuses, artifact versions/history, and action history
+
+Typical flow:
+
+1. Open `Workspace / Jobs`
+2. Create a job once with title and region
+3. Upload or copy in the tender and optional BOQ once; in the production app pricing uses the current released database automatically
+4. Run `Analyze Tender`, `Generate Draft BOQ`, `Run Gap Check`, `Run Tender -> Pricing`, or `Price BOQ Only`
+5. Reopen the same job later from disk and continue without re-uploading
+
+Workspace hardening:
+
+- reruns do not overwrite prior important outputs; a new versioned artifact is written and the latest pointer is updated
+- each major step tracks `not_started`, `running`, `completed`, or `failed` status in `state.json`
+- the current operator/display name is stored with job changes and action history for lightweight attribution
+- jobs can be archived to hide them from the default list without deleting their files
+- jobs can also be deleted permanently with confirmation from the workspace page
+
+Rerun behavior:
+
+- running a step again writes a new artifact version with revision/timestamp naming
+- previous versions remain downloadable from the job artifact history
+- the latest successful artifact is shown as the current file for that artifact type
+
+Resume behavior:
+
+- reopening a job restores saved tender, BOQ, and database paths from `state.json`
+- the workspace page shows current step status and latest successful artifacts
+- colleagues can continue from the next logical step without re-uploading
+
+Production vs admin workspace behavior:
+
+- in the production app, pricing actions resolve the current released production database automatically
+- in the admin app, jobs can still point at the master/training database or another working database when needed
+- both apps reuse the same workspace/job folders, state tracking, artifact history, and operator attribution
+
+Operator attribution:
+
+- the workspace page allows a simple operator/display name for the current session
+- job changes, step runs, artifact writes, and archive/delete actions record operator attribution in job state and logs
+- release creation and current-release reselection record operator attribution in release metadata
 
 ## First Run
 
@@ -69,6 +240,12 @@ Run Tender Analysis v1 on the demo tender text:
 
 ```powershell
 py -3.11 -m src.main analyze-tender --input tender\demo_tender_notice.txt --out output\tender_analysis_demo.xlsx --json output\tender_analysis_demo.json
+```
+
+The same commands also accept PDF tender files, including scanned PDFs that need OCR fallback:
+
+```powershell
+py -3.11 -m src.main analyze-tender --input tender\my_tender.pdf --out output\my_tender_analysis.xlsx
 ```
 
 Generate the checklist-focused tender workbook:
@@ -118,7 +295,7 @@ py -3.11 -m src.main batch --db database\qs_database.xlsx --boq-dir boq --out-di
 
 ## Tender Analysis
 
-Tender Analysis v1 is for early tender review before BOQ gap checking and pricing. It reads local tender text, extracts likely requirements, builds a submission checklist, parses likely scope sections, and writes a review-first workbook with:
+Tender Analysis v1 is for early tender review before BOQ gap checking and pricing. It reads local tender text, PDF, or structured offline extracts, extracts likely requirements, builds a submission checklist, parses likely scope sections, and writes a review-first workbook with:
 
 - `Tender Analysis Summary`
 - `Tender Checklist`
@@ -135,6 +312,12 @@ Run against a normalized extracted tender text file:
 
 ```powershell
 py -3.11 -m src.main analyze-tender --input tender\my_tender_text.txt --out output\my_tender_analysis.xlsx
+```
+
+Run directly against a tender PDF:
+
+```powershell
+py -3.11 -m src.main analyze-tender --input tender\my_tender.pdf --out output\my_tender_analysis.xlsx
 ```
 
 Run against a structured CSV or Excel-derived text export:
@@ -162,6 +345,8 @@ Generate draft BOQ suggestions without fabricating quantities:
 ```powershell
 py -3.11 -m src.main draft-boq --input tender\demo_tender_scope_only.txt --out output\draft_boq_demo.xlsx --json output\draft_boq_demo.json
 ```
+
+Draft BOQ Suggestions are synthesized from tender/specification wording into concise BOQ-style review items. Headings, definitions, references, and weak instruction-only text are filtered where possible, and related clause fragments are merged before suggestion drafting.
 
 Compare tender scope against a BOQ workbook:
 
@@ -268,6 +453,18 @@ Tender-to-price tests:
 py -3.11 -m pytest tests\test_tender_to_price.py
 ```
 
+UI helper smoke tests:
+
+```powershell
+py -3.11 -m pytest tests\test_ui_helpers.py
+```
+
+PDF ingestion tests:
+
+```powershell
+py -3.11 -m pytest tests\test_pdf_ingestion.py
+```
+
 Equivalent CLI commands are also available through `python -m src.main`:
 
 ```powershell
@@ -292,5 +489,7 @@ py -3.11 -m src.main promote-approved --db database\qs_database.xlsx --json outp
 - The estimator learning loop uses `Candidate Review` as the editable team worksheet, then syncs decisions back into `CandidateMatches`, `Aliases`, `RateLibrary`, and timestamped `ReviewLog` entries.
 - Additional step-by-step ingestion notes are in [docs/workflows.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/workflows.md).
 - Tender Analysis is review-first. Low-confidence extractions and ambiguous instructions should still be checked by the estimator or QS before hand-off into BOQ gap review and pricing.
-- Draft BOQ generation does not fabricate quantities. It only creates sectioned item suggestions, units, placeholders, source basis, and confidence for review.
+- PDF support is also review-first. OCR output can miss tables, misread quantities, or distort formatting, so extracted tender text should still be checked before pricing decisions are made.
+- Draft BOQ generation does not fabricate quantities. It creates synthesized, sectioned, review-first item suggestions with source basis, source excerpts, cautious unit inference, and confidence for QS review.
 - The integrated `tender-price` flow also keeps tender-drafted rows and gap-derived rows explicitly flagged in `Pricing Handoff`; missing measurements remain for human review.
+- The Streamlit app is a thin internal UI over the same backend modules. Ad hoc runs still use isolated working folders under `output/ui_runs`, while persistent job workspaces are stored under `workspace/jobs`.

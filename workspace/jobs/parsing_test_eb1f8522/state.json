@@ -1,0 +1,210 @@
+{
+  "job_id": "parsing_test_eb1f8522",
+  "title": "Parsing Test",
+  "region": "Nairobi",
+  "created_at": "2026-03-18T11:01:06+00:00",
+  "job_dir": "workspace\\jobs\\parsing_test_eb1f8522",
+  "inputs": {
+    "tender": "workspace\\jobs\\parsing_test_eb1f8522\\inputs\\tender__addendum_no_5_kaa_ot_kia_0026_2025_2026_proposed_slope_stabilization_and_land_reclamation_at_kia.pdf",
+    "boq": "workspace\\jobs\\parsing_test_eb1f8522\\inputs\\boq__kaa_boq_filled_v2.xlsx",
+    "database": "workspace\\jobs\\parsing_test_eb1f8522\\inputs\\database__kaa_kia_boq_filled.xlsx"
+  },
+  "artifacts": [
+    {
+      "artifact_id": "tender_analysis_workbook_9f1fc993",
+      "artifact_type": "tender_analysis_workbook",
+      "label": "Tender Analysis Workbook",
+      "action": "analyze_tender",
+      "latest_path": "workspace\\jobs\\parsing_test_eb1f8522\\outputs\\parsing_test_tender_analysis_workbook_r01_20260318T110253+0000.xlsx",
+      "latest_status": "completed",
+      "latest_created_at": "2026-03-18T11:03:06+00:00",
+      "latest_created_by": "Rono",
+      "versions": [
+        {
+          "version_id": "v1",
+          "path": "workspace\\jobs\\parsing_test_eb1f8522\\outputs\\parsing_test_tender_analysis_workbook_r01_20260318T110253+0000.xlsx",
+          "status": "completed",
+          "created_at": "2026-03-18T11:03:06+00:00",
+          "created_by": "Rono"
+        }
+      ]
+    },
+    {
+      "artifact_id": "tender_analysis_json_2cd9e57a",
+      "artifact_type": "tender_analysis_json",
+      "label": "Tender Analysis JSON",
+      "action": "analyze_tender",
+      "latest_path": "workspace\\jobs\\parsing_test_eb1f8522\\outputs\\parsing_test_tender_analysis_json_r01_20260318T110253+0000.json",
+      "latest_status": "completed",
+      "latest_created_at": "2026-03-18T11:03:06+00:00",
+      "latest_created_by": "Rono",
+      "versions": [
+        {
+          "version_id": "v1",
+          "path": "workspace\\jobs\\parsing_test_eb1f8522\\outputs\\parsing_test_tender_analysis_json_r01_20260318T110253+0000.json",
+          "status": "completed",
+          "created_at": "2026-03-18T11:03:06+00:00",
+          "created_by": "Rono"
+        }
+      ]
+    }
+  ],
+  "status": {
+    "current_status": "completed",
+    "last_action": "analyze_tender",
+    "last_updated": "2026-03-18T11:03:06+00:00",
+    "messages": [
+      "2026-03-18T11:02:53+00:00 | Analyze Tender | running | Step started.",
+      "2026-03-18T11:03:06+00:00 | Analyze Tender | completed | Step completed successfully."
+    ],
+    "actions": {
+      "analyze_tender": {
+        "status": "completed",
+        "message": "Step completed successfully.",
+        "updated_at": "2026-03-18T11:03:06+00:00"
+      }
+    },
+    "steps": {
+      "analyze_tender": {
+        "status": "completed",
+        "started_at": "2026-03-18T11:02:53+00:00",
+        "completed_at": "2026-03-18T11:03:06+00:00",
+        "failed_at": "",
+        "last_outcome": "Step completed successfully.",
+        "last_error": "",
+        "last_run_by": "Rono",
+        "latest_artifact_types": [
+          "tender_analysis_workbook",
+          "tender_analysis_json"
+        ]
+      },
+      "draft_boq": {
+        "status": "not_started",
+        "started_at": "",
+        "completed_at": "",
+        "failed_at": "",
+        "last_outcome": "",
+        "last_error": "",
+        "last_run_by": "",
+        "latest_artifact_types": []
+      },
+      "gap_check": {
+        "status": "not_started",
+        "started_at": "",
+        "completed_at": "",
+        "failed_at": "",
+        "last_outcome": "",
+        "last_error": "",
+        "last_run_by": "",
+        "latest_artifact_types": []
+      },
+      "tender_price": {
+        "status": "not_started",
+        "started_at": "",
+        "completed_at": "",
+        "failed_at": "",
+        "last_outcome": "",
+        "last_error": "",
+        "last_run_by": "",
+        "latest_artifact_types": []
+      },
+      "boq_price": {
+        "status": "not_started",
+        "started_at": "",
+        "completed_at": "",
+        "failed_at": "",
+        "last_outcome": "",
+        "last_error": "",
+        "last_run_by": "",
+        "latest_artifact_types": []
+      }
+    }
+  },
+  "operator_name": "Rono",
+  "last_modified_by": "Rono",
+  "last_modified_at": "2026-03-18T11:03:06+00:00",
+  "archived": false,
+  "archived_at": "",
+  "archived_by": "",
+  "action_history": [
+    {
+      "timestamp": "2026-03-18T11:01:06+00:00",
+      "action": "job_created",
+      "status": "completed",
+      "message": "Job created: Parsing Test",
+      "operator_name": "Rono",
+      "details": {}
+    },
+    {
+      "timestamp": "2026-03-18T11:01:50+00:00",
+      "action": "file_uploaded",
+      "status": "completed",
+      "message": "Saved uploaded tender.",
+      "operator_name": "Rono",
+      "details": {
+        "input_key": "tender",
+        "path": "workspace\\jobs\\parsing_test_eb1f8522\\inputs\\tender__addendum_no_5_kaa_ot_kia_0026_2025_2026_proposed_slope_stabilization_and_land_reclamation_at_kia.pdf"
+      }
+    },
+    {
+      "timestamp": "2026-03-18T11:02:17+00:00",
+      "action": "file_uploaded",
+      "status": "completed",
+      "message": "Saved uploaded boq.",
+      "operator_name": "Rono",
+      "details": {
+        "input_key": "boq",
+        "path": "workspace\\jobs\\parsing_test_eb1f8522\\inputs\\boq__kaa_boq_filled_v2.xlsx"
+      }
+    },
+    {
+      "timestamp": "2026-03-18T11:02:42+00:00",
+      "action": "file_uploaded",
+      "status": "completed",
+      "message": "Saved uploaded database.",
+      "operator_name": "Rono",
+      "details": {
+        "input_key": "database",
+        "path": "workspace\\jobs\\parsing_test_eb1f8522\\inputs\\database__kaa_kia_boq_filled.xlsx"
+      }
+    },
+    {
+      "timestamp": "2026-03-18T11:02:53+00:00",
+      "action": "analyze_tender",
+      "status": "running",
+      "message": "Step started.",
+      "operator_name": "Rono",
+      "details": {}
+    },
+    {
+      "timestamp": "2026-03-18T11:03:06+00:00",
+      "action": "artifact_written",
+      "status": "completed",
+      "message": "Tender Analysis Workbook saved as v1.",
+      "operator_name": "Rono",
+      "details": {
+        "artifact_type": "tender_analysis_workbook",
+        "path": "workspace\\jobs\\parsing_test_eb1f8522\\outputs\\parsing_test_tender_analysis_workbook_r01_20260318T110253+0000.xlsx"
+      }
+    },
+    {
+      "timestamp": "2026-03-18T11:03:06+00:00",
+      "action": "artifact_written",
+      "status": "completed",
+      "message": "Tender Analysis JSON saved as v1.",
+      "operator_name": "Rono",
+      "details": {
+        "artifact_type": "tender_analysis_json",
+        "path": "workspace\\jobs\\parsing_test_eb1f8522\\outputs\\parsing_test_tender_analysis_json_r01_20260318T110253+0000.json"
+      }
+    },
+    {
+      "timestamp": "2026-03-18T11:03:06+00:00",
+      "action": "analyze_tender",
+      "status": "completed",
+      "message": "Step completed successfully.",
+      "operator_name": "Rono",
+      "details": {}
+    }
+  ]
+}

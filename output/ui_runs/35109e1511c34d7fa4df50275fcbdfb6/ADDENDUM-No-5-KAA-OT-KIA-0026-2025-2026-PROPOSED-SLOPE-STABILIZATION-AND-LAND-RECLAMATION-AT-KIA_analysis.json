@@ -1,0 +1,657 @@
+{
+  "document": {
+    "source_path": "output\\ui_runs\\35109e1511c34d7fa4df50275fcbdfb6\\ADDENDUM-No-5-KAA-OT-KIA-0026-2025-2026-PROPOSED-SLOPE-STABILIZATION-AND-LAND-RECLAMATION-AT-KIA.pdf",
+    "document_name": "ADDENDUM-No-5-KAA-OT-KIA-0026-2025-2026-PROPOSED-SLOPE-STABILIZATION-AND-LAND-RECLAMATION-AT-KIA.pdf",
+    "document_type": "pdf",
+    "title": "KAA/OT/KIA/0026/2025-2026",
+    "line_count": 586
+  },
+  "requirements": [
+    {
+      "requirement_id": "REQ-001",
+      "category": "Securities",
+      "description": "Securities: Kindly ensure your tender is valid for a period of 186 days and your tender security is,",
+      "mandatory": true,
+      "source_reference": "L45",
+      "confidence": 79.0,
+      "action_needed": "Confirm instrument type, value, and issuing bank.",
+      "owner": "Commercial Manager",
+      "status": "pending review",
+      "notes": "Review exact tender wording for securities.",
+      "matched_phrase": "tender security",
+      "extracted_text": "Kindly ensure your tender is valid for a period of 186 days and your tender security is,",
+      "review_flag": true
+    },
+    {
+      "requirement_id": "REQ-002",
+      "category": "Pricing Instructions",
+      "description": "Pricing Instructions: Dayworks pricing instruction",
+      "mandatory": false,
+      "source_reference": "L70",
+      "confidence": 91.0,
+      "action_needed": "Review pricing instruction before BOQ gap check and pricing.",
+      "owner": "QS",
+      "status": "pending review",
+      "notes": "",
+      "matched_phrase": "dayworks",
+      "extracted_text": "DAYWORKS",
+      "review_flag": false
+    },
+    {
+      "requirement_id": "REQ-003",
+      "category": "Pricing Instructions",
+      "description": "Pricing Instructions: Provisional sum pricing instruction",
+      "mandatory": false,
+      "source_reference": "L73",
+      "confidence": 73.0,
+      "action_needed": "Review pricing instruction before BOQ gap check and pricing.",
+      "owner": "QS",
+      "status": "pending review",
+      "notes": "",
+      "matched_phrase": "provisional sum",
+      "extracted_text": "\u2018AATZSR of Sub-Total 1 of Bills as Provisional Sum FOr",
+      "review_flag": false
+    },
+    {
+      "requirement_id": "REQ-004",
+      "category": "Submission Documents",
+      "description": "Submission Documents: \u2018CARRIED TO PAGE ON THE FORM OF TENDER",
+      "mandatory": true,
+      "source_reference": "L82",
+      "confidence": 73.0,
+      "action_needed": "Confirm document is available and include it in submission pack.",
+      "owner": "Estimator",
+      "status": "pending review",
+      "notes": "",
+      "matched_phrase": "form of tender",
+      "extracted_text": "\u2018CARRIED TO PAGE ON THE FORM OF TENDER",
+      "review_flag": false
+    }
+  ],
+  "checklist_items": [
+    {
+      "requirement_id": "REQ-001",
+      "category": "Securities",
+      "description": "Securities: Kindly ensure your tender is valid for a period of 186 days and your tender security is,",
+      "mandatory": true,
+      "source_reference": "L45",
+      "confidence": 79.0,
+      "action_needed": "Confirm instrument type, value, and issuing bank.",
+      "owner": "Commercial Manager",
+      "status": "pending review",
+      "notes": "Review exact tender wording for securities. Human review required."
+    },
+    {
+      "requirement_id": "REQ-002",
+      "category": "Pricing Instructions",
+      "description": "Pricing Instructions: Dayworks pricing instruction",
+      "mandatory": false,
+      "source_reference": "L70",
+      "confidence": 91.0,
+      "action_needed": "Review pricing instruction before BOQ gap check and pricing.",
+      "owner": "QS",
+      "status": "pending review",
+      "notes": ""
+    },
+    {
+      "requirement_id": "REQ-003",
+      "category": "Pricing Instructions",
+      "description": "Pricing Instructions: Provisional sum pricing instruction",
+      "mandatory": false,
+      "source_reference": "L73",
+      "confidence": 73.0,
+      "action_needed": "Review pricing instruction before BOQ gap check and pricing.",
+      "owner": "QS",
+      "status": "pending review",
+      "notes": ""
+    },
+    {
+      "requirement_id": "REQ-004",
+      "category": "Submission Documents",
+      "description": "Submission Documents: \u2018CARRIED TO PAGE ON THE FORM OF TENDER",
+      "mandatory": true,
+      "source_reference": "L82",
+      "confidence": 73.0,
+      "action_needed": "Confirm document is available and include it in submission pack.",
+      "owner": "Estimator",
+      "status": "pending review",
+      "notes": ""
+    }
+  ],
+  "scope_sections": [
+    {
+      "section_name": "Earthworks",
+      "confidence": 88.0,
+      "source_references": [
+        "L66",
+        "L243",
+        "L245",
+        "L249",
+        "L363",
+        "L376",
+        "L403"
+      ],
+      "matched_keywords": [
+        "excavation",
+        "fill"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "Concrete",
+      "confidence": 78.0,
+      "source_references": [
+        "L337",
+        "L407",
+        "L411",
+        "L415",
+        "L418",
+        "L420",
+        "L422",
+        "L423",
+        "L425",
+        "L460",
+        "L466",
+        "L498",
+        "L523",
+        "L530",
+        "L566"
+      ],
+      "matched_keywords": [
+        "concrete",
+        "reinforcement",
+        "formwork"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "Dayworks",
+      "confidence": 78.0,
+      "source_references": [
+        "L70"
+      ],
+      "matched_keywords": [
+        "dayworks"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "Drainage",
+      "confidence": 78.0,
+      "source_references": [
+        "L67",
+        "L393"
+      ],
+      "matched_keywords": [
+        "drainage"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "Electrical",
+      "confidence": 78.0,
+      "source_references": [
+        "L139",
+        "L551",
+        "L554",
+        "L569"
+      ],
+      "matched_keywords": [
+        "lighting",
+        "electrical"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "External Works",
+      "confidence": 78.0,
+      "source_references": [
+        "L456"
+      ],
+      "matched_keywords": [
+        "fencing"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "Finishes",
+      "confidence": 78.0,
+      "source_references": [
+        "L218",
+        "L230",
+        "L232",
+        "L240",
+        "L241",
+        "L251",
+        "L262"
+      ],
+      "matched_keywords": [
+        "plaster",
+        "tiling",
+        "paint"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "Plumbing",
+      "confidence": 78.0,
+      "source_references": [
+        "L254",
+        "L270",
+        "L287"
+      ],
+      "matched_keywords": [
+        "plumbing"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "Preliminaries",
+      "confidence": 78.0,
+      "source_references": [
+        "L91"
+      ],
+      "matched_keywords": [
+        "preliminaries"
+      ],
+      "notes": ""
+    },
+    {
+      "section_name": "Provisional Items",
+      "confidence": 78.0,
+      "source_references": [
+        "L73"
+      ],
+      "matched_keywords": [
+        "provisional",
+        "provisional sum"
+      ],
+      "notes": ""
+    }
+  ],
+  "draft_suggestions": [
+    {
+      "section": "Earthworks",
+      "description": "Excavation to reduce levels and cart away surplus material",
+      "unit": "m3",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via excavation, fill",
+      "source_reference": "L66, L67, L68, L69, L70, L71, L72, L243, L244, L245, L246, L247, L248, L249, L250, L376, L377, L403",
+      "confidence": 84.0,
+      "source_excerpt": "EXCAVATION AND FILLING FOR STRUCTURES \u2018CULVERT AND DRAINAGE WORKS \u201cGRAVEL WEARING COURSE ROAD FURNITURE DAYWORKS FLECTRICAL WORKS \u2018Sub Total T up filler 101/07 Prepare surface, apply wall fille, supply and apply 3 coats of silk vinyl pan to internal walls 101/08 Prepare surface, apply wall filler, supply and apply 3 coats of Perma | BILLNO. 7: EXCAVATION AND FILLING FOR STRUCTURES mat DescRIPTON coat) quanmmy | RAE | AVOUNT xtra over items 81 for excavation",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting.; Consolidated from multiple related tender clauses."
+    },
+    {
+      "section": "Earthworks",
+      "description": "Fill with approved selected material",
+      "unit": "m3",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via excavation, fill",
+      "source_reference": "L66, L67, L68, L69, L70, L71, L72, L243, L244, L245, L246, L247, L248, L249, L250, L363, L364, L365, L366, L367, L368, L369, L370, L371, L372, L373, L376, L377, L403",
+      "confidence": 86.0,
+      "source_excerpt": "EXCAVATION AND FILLING FOR STRUCTURES \u2018CULVERT AND DRAINAGE WORKS \u201cGRAVEL WEARING COURSE ROAD FURNITURE DAYWORKS FLECTRICAL WORKS \u2018Sub Total T up filler 101/07 Prepare surface, apply wall fille, supply and apply 3 coats of silk vinyl pan to internal walls 101/08 Prepare surface, apply wall filler, supply and apply 3 coats of Perma | 501 | exceeding 150eam in Fill fs directed by the Engineer | m? 21,000 Spoil in soft material 508 mw 4,200 Provide lay and compacted to refusal in 503. | 200mm layer",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting.; Consolidated from multiple related tender clauses."
+    },
+    {
+      "section": "Earthworks",
+      "description": "Drainage installation complete",
+      "unit": "m",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via excavation, fill",
+      "source_reference": "L66, L67, L68, L69, L70, L71, L72, L243, L244, L245, L246, L247, L248, L249, L250",
+      "confidence": 82.0,
+      "source_excerpt": "EXCAVATION AND FILLING FOR STRUCTURES \u2018CULVERT AND DRAINAGE WORKS \u201cGRAVEL WEARING COURSE ROAD FURNITURE DAYWORKS FLECTRICAL WORKS \u2018Sub Total T up filler 101/07 Prepare surface, apply wall fille, supply and apply 3 coats of silk vinyl pan to internal walls 101/08 Prepare surface, apply wall filler, supply and apply 3 coats of Perma",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Earthworks",
+      "description": "Compaction of fill to specified density",
+      "unit": "m2",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via excavation, fill",
+      "source_reference": "L363, L364, L365, L366, L367, L368, L369, L370, L371, L372, L373",
+      "confidence": 82.0,
+      "source_excerpt": "501 | exceeding 150eam in Fill fs directed by the Engineer | m? 21,000 Spoil in soft material 508 mw 4,200 Provide lay and compacted to refusal in 503. | 200mm layers approved rockill as directed by i im 25,200 \u201850mm Top sing 504 | specification m 42,000",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Concrete",
+      "description": "In-situ concrete works",
+      "unit": "m3",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via concrete, reinforcement, formwork",
+      "source_reference": "L337, L338, L339, L340, L341, L407, L408, L411, L412, L415, L416, L417, L418, L419, L420, L421, L422, L423, L424, L425, L460, L461, L462, L463, L464, L465, L466, L467, L468, L469, L470, L471, L472, L473, L474, L475, L476, L498, L523, L524, L525, L526, L530, L531, L566, L567, L568, L569, L570",
+      "confidence": 80.0,
+      "source_excerpt": "403 __ concrete srutures ms 10 \u2018Removal of barbed wire or chain-link fence and storing 19 fa desgnated location a the County offices or as instructed inner diameter (ID) precast concrete pipes including bed, sursound and ameter (D) precast concrete pipes including bed, surround and reinforced concrete to keadvalls, ingwalls aprons, to pipe culverts Inching formovork and | 06 _| reinforcement m | 200 Provide and place clase 20720 reinforced concrete to headwalls, wingwalls, aprons, to pipe culver",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting.; Consolidated from multiple related tender clauses."
+    },
+    {
+      "section": "Concrete",
+      "description": "Lay and joint pipes",
+      "unit": "m",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via concrete, reinforcement, formwork",
+      "source_reference": "L337, L338, L339, L340, L341, L407, L408, L411, L412, L415, L416, L417, L418, L419, L420, L421, L422",
+      "confidence": 74.0,
+      "source_excerpt": "403 __ concrete srutures ms 10 \u2018Removal of barbed wire or chain-link fence and storing 19 fa desgnated location a the County offices or as instructed inner diameter (ID) precast concrete pipes including bed, sursound and ameter (D) precast concrete pipes including bed, surround and reinforced concrete to keadvalls, ingwalls aprons, to pipe culverts Inching formovork and | 06 _| reinforcement m | 200 Provide and place clase 20720 reinforced concrete to headwalls, wingwalls, aprons, to pipe culver",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting.; Consolidated from multiple related tender clauses."
+    },
+    {
+      "section": "Concrete",
+      "description": "Drainage installation complete",
+      "unit": "m",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via concrete, reinforcement, formwork",
+      "source_reference": "L337, L338, L339, L340, L341, L407, L408, L411, L412, L415, L416, L417",
+      "confidence": 72.0,
+      "source_excerpt": "403 __ concrete srutures ms 10 \u2018Removal of barbed wire or chain-link fence and storing 19 fa desgnated location a the County offices or as instructed inner diameter (ID) precast concrete pipes including bed, sursound and ameter (D) precast concrete pipes including bed, surround and reinforced concrete to keadvalls, ingwalls aprons, to pipe culverts Inching formovork and",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Concrete",
+      "description": "Chainlink fencing complete",
+      "unit": "m",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via concrete, reinforcement, formwork",
+      "source_reference": "L337, L338, L339, L340, L341, L407, L408, L411, L412, L415, L416, L417",
+      "confidence": 72.0,
+      "source_excerpt": "403 __ concrete srutures ms 10 \u2018Removal of barbed wire or chain-link fence and storing 19 fa desgnated location a the County offices or as instructed inner diameter (ID) precast concrete pipes including bed, sursound and ameter (D) precast concrete pipes including bed, surround and reinforced concrete to keadvalls, ingwalls aprons, to pipe culverts Inching formovork and",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Concrete",
+      "description": "Reinforcement to concrete works",
+      "unit": "kg",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via concrete, reinforcement, formwork",
+      "source_reference": "L418, L419, L420, L421, L422, L423, L424, L425, L460, L461, L462, L463, L464, L465",
+      "confidence": 74.0,
+      "source_excerpt": "06 _| reinforcement m | 200 Provide and place clase 20720 reinforced concrete to headwalls, wingwalls, aprons, to pipe culverts including formwork and | 308 __| reinforcement. m | 100 Trovide and ix wel fabric reinforcement fo BS 4483 size A142 20 concrete bases; inciude carting away Ps 2002 Ditto But for chain-link anchoring posts \u00bb 2008",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting.; Consolidated from multiple related tender clauses."
+    },
+    {
+      "section": "Concrete",
+      "description": "Formwork to concrete surfaces",
+      "unit": "m2",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via concrete, reinforcement, formwork",
+      "source_reference": "L418, L419, L420, L421, L422",
+      "confidence": 72.0,
+      "source_excerpt": "06 _| reinforcement m | 200 Provide and place clase 20720 reinforced concrete to headwalls, wingwalls, aprons, to pipe culverts including formwork and",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Concrete",
+      "description": "Electrical installation complete",
+      "unit": "",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via concrete, reinforcement, formwork",
+      "source_reference": "L530, L531, L566, L567, L568, L569, L570",
+      "confidence": 72.0,
+      "source_excerpt": "\u2018Mass concrete; Clas\u00e9 20 in ground beam rovide for concrete works overall exten the ting plinth for the ightingfitings inclusive of | bs 1 Itbour instalation ofthe lighting ings complet ago | mith secondary aes",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Dayworks",
+      "description": "Insert BOQ line items for dayworks based on tender text.",
+      "unit": "day",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Scope section inferred from keywords: dayworks",
+      "source_reference": "L70",
+      "confidence": 73.0,
+      "source_excerpt": "",
+      "review_flag": true,
+      "notes": "Section-level placeholder because no clear line-item wording was found."
+    },
+    {
+      "section": "Drainage",
+      "description": "Drainage installation complete",
+      "unit": "m",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via drainage",
+      "source_reference": "L67, L68, L69, L70, L71, L72, L393, L394, L395, L396",
+      "confidence": 72.0,
+      "source_excerpt": "\u2018CULVERT AND DRAINAGE WORKS \u201cGRAVEL WEARING COURSE ROAD FURNITURE DAYWORKS FLECTRICAL WORKS \u2018Sub Total T \u2018CULVERT AND DRAINAGE WORKS Bul Nos Description em No. Units | Quantity | nate 05s) | Amount (KES)",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Electrical",
+      "description": "Electrical installation complete",
+      "unit": "",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via lighting, electrical",
+      "source_reference": "L139, L140, L141, L551, L552, L554, L555, L556, L557, L569, L570",
+      "confidence": 74.0,
+      "source_excerpt": "Integrated with hinges and cari lighting for exclusive use bythe Engineer inclusive of the first 5,000 lm per Vehicle month to | BILL OF QUANITTIES ELECTRICAL WORKS FOR ELEVATED APPROACH LIGHTS RE-INSTALLTION mu, \u201cTaking the co-orinais of he exsting lighting firings tefore lope sabizaton and e-tsing the co-rdites afer spe stablization to cary out \u2018reinstallation ofthe Biting instalation ofthe lighting ings complet ago | mith secondary aes",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting.; Consolidated from multiple related tender clauses."
+    },
+    {
+      "section": "External Works",
+      "description": "Chainlink fencing complete",
+      "unit": "m",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via fencing",
+      "source_reference": "L456, L457, L458",
+      "confidence": 72.0,
+      "source_excerpt": "Txcavate holes Tor fencing pow footing not exceeding 1.50 m deep, average 1.0m deep in hard and soft",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Finishes",
+      "description": "Plaster to internal and external surfaces",
+      "unit": "m2",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via plaster, tiling, paint",
+      "source_reference": "L218, L230, L231, L232, L233, L234, L235, L236, L237, L238, L239",
+      "confidence": 74.0,
+      "source_excerpt": "\u201cApply 25mm thick Plaster with 1:3 | Hack existing nil floor plaster and supply and install Non-slip ceramic floor tiling, complete with adhesive & grout 300 1.01/06 Remove the existing ceiling boards including touch up repairs of brandering to damages areas, supply and install Sm thick chipboard",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting.; Consolidated from multiple related tender clauses."
+    },
+    {
+      "section": "Finishes",
+      "description": "Wall and floor tiling",
+      "unit": "m2",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via plaster, tiling, paint",
+      "source_reference": "L230, L231, L232, L233, L234, L235, L236, L237, L238, L239",
+      "confidence": 72.0,
+      "source_excerpt": "Hack existing nil floor plaster and supply and install Non-slip ceramic floor tiling, complete with adhesive & grout 300 1.01/06 Remove the existing ceiling boards including touch up repairs of brandering to damages areas, supply and install Sm thick chipboard",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Finishes",
+      "description": "Fill with approved selected material",
+      "unit": "m3",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via plaster, tiling, paint",
+      "source_reference": "L240, L241, L242, L243, L244, L245, L246, L247, L248, L249, L250",
+      "confidence": 72.0,
+      "source_excerpt": "Ceiling and paint with 2 coats of \u2018emulsion paint or similar approved including application of Gyproc touch up filler 101/07 Prepare surface, apply wall fille, supply and apply 3 coats of silk vinyl pan to internal walls 101/08 Prepare surface, apply wall filler, supply and apply 3 coats of Perma",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting."
+    },
+    {
+      "section": "Finishes",
+      "description": "Painting and decorating",
+      "unit": "m2",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Tender text matched via plaster, tiling, paint",
+      "source_reference": "L240, L241, L242, L243, L244, L245, L246, L247, L248, L249, L250, L251, L252, L253, L254, L255, L256, L257, L258, L259, L262, L263, L264, L265, L266, L267, L268, L269, L270, L271",
+      "confidence": 74.0,
+      "source_excerpt": "Ceiling and paint with 2 coats of \u2018emulsion paint or similar approved including application of Gyproc touch up filler 101/07 Prepare surface, apply wall fille, supply and apply 3 coats of silk vinyl pan to internal walls 101/08 Prepare surface, apply wall filler, supply and apply 3 coats of Perma | Coat/ Weather guard paint or similar to External walls mw 1500 PLUMBING SUB - TOTAL I Tem Description: Unt | Oy Rate (KES) \u2018Amount (KES) 101/09 supply and install pre-painted ordinary | m* 300 iron sh",
+      "review_flag": true,
+      "notes": "Draft BOQ suggestion only. Quantity must be measured or confirmed.; Synthesized from tender clause wording for review-first BOQ drafting.; Consolidated from multiple related tender clauses."
+    },
+    {
+      "section": "Plumbing",
+      "description": "Insert BOQ line items for plumbing based on tender text.",
+      "unit": "",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Scope section inferred from keywords: plumbing",
+      "source_reference": "L254, L270, L287",
+      "confidence": 73.0,
+      "source_excerpt": "",
+      "review_flag": true,
+      "notes": "Section-level placeholder because no clear line-item wording was found."
+    },
+    {
+      "section": "Preliminaries",
+      "description": "Insert BOQ line items for preliminaries based on tender text.",
+      "unit": "sum",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Scope section inferred from keywords: preliminaries",
+      "source_reference": "L91",
+      "confidence": 73.0,
+      "source_excerpt": "",
+      "review_flag": true,
+      "notes": "Section-level placeholder because no clear line-item wording was found."
+    },
+    {
+      "section": "Provisional Items",
+      "description": "Insert BOQ line items for provisional items based on tender text.",
+      "unit": "sum",
+      "quantity_placeholder": "TBD",
+      "rate_placeholder": "Rate to be built/priced",
+      "amount_placeholder": "Derived after measurement",
+      "source_basis": "Scope section inferred from keywords: provisional, provisional sum",
+      "source_reference": "L73",
+      "confidence": 73.0,
+      "source_excerpt": "",
+      "review_flag": true,
+      "notes": "Section-level placeholder because no clear line-item wording was found."
+    }
+  ],
+  "gap_items": [],
+  "clarifications": [
+    {
+      "clarification_id": "CL-001",
+      "category": "Missing Measurements",
+      "description": "\u2018AATZSR of Sub-Total 1 of Bills as Provisional Sum FOr",
+      "source_reference": "L73",
+      "confidence": 68.0,
+      "action_needed": "Request missing dimensions, quantities, or measurement rules.",
+      "review_flag": true,
+      "notes": "Tender wording may require clarification before pricing or submission."
+    },
+    {
+      "clarification_id": "CL-002",
+      "category": "Unclear Scope",
+      "description": "\"ISI2GB storage and SGB RAM as directed",
+      "source_reference": "L185",
+      "confidence": 68.0,
+      "action_needed": "Confirm the intended scope wording and BOQ treatment.",
+      "review_flag": true,
+      "notes": "Tender wording may require clarification before pricing or submission."
+    },
+    {
+      "clarification_id": "CL-003",
+      "category": "Unclear Scope",
+      "description": "rockill as directed by",
+      "source_reference": "L370",
+      "confidence": 68.0,
+      "action_needed": "Confirm the intended scope wording and BOQ treatment.",
+      "review_flag": true,
+      "notes": "Tender wording may require clarification before pricing or submission."
+    },
+    {
+      "clarification_id": "CL-004",
+      "category": "Requirement Review",
+      "description": "Securities: Kindly ensure your tender is valid for a period of 186 days and your tender security is,",
+      "source_reference": "L45",
+      "confidence": 79.0,
+      "action_needed": "Confirm the exact tender requirement and record the response route.",
+      "review_flag": true,
+      "notes": "Review exact tender wording for securities."
+    }
+  ],
+  "summary": {
+    "document_name": "ADDENDUM-No-5-KAA-OT-KIA-0026-2025-2026-PROPOSED-SLOPE-STABILIZATION-AND-LAND-RECLAMATION-AT-KIA.pdf",
+    "title": "KAA/OT/KIA/0026/2025-2026",
+    "total_requirements": 4,
+    "mandatory_requirements": 2,
+    "flagged_requirements": 1,
+    "checklist_items": 4,
+    "scope_sections": 10,
+    "detected_scope": [
+      "Earthworks",
+      "Concrete",
+      "Dayworks",
+      "Drainage",
+      "Electrical",
+      "External Works",
+      "Finishes",
+      "Plumbing",
+      "Preliminaries",
+      "Provisional Items"
+    ],
+    "commercial_clues": [
+      "Securities: Kindly ensure your tender is valid for a period of 186 days and your tender security is,",
+      "Pricing Instructions: Dayworks pricing instruction",
+      "Pricing Instructions: Provisional sum pricing instruction"
+    ],
+    "review_notes": [
+      "REQ-001: Review exact tender wording for securities."
+    ],
+    "gap_items": 0,
+    "draft_suggestions": 22,
+    "clarifications": 4
+  }
+}

@@ -8,10 +8,12 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+from .models import AppConfig
+from .pdf_ingestion import extract_text_from_pdf
 from .tender_models import TenderDocument, TenderSourceLine
 
 
-SUPPORTED_TENDER_SUFFIXES = {".txt", ".md", ".csv", ".xlsx", ".xlsm"}
+SUPPORTED_TENDER_SUFFIXES = {".txt", ".md", ".csv", ".xlsx", ".xlsm", ".pdf"}
 
 
 def _clean_text(value: object) -> str:
@@ -33,6 +35,16 @@ def _read_text_file(path: Path) -> list[TenderSourceLine]:
         if not text:
             continue
         lines.append(TenderSourceLine(source_reference=f"L{index}", text=text, line_number=index))
+    return lines
+
+
+def _lines_from_text(text: str) -> list[TenderSourceLine]:
+    lines: list[TenderSourceLine] = []
+    for index, raw in enumerate(text.splitlines(), start=1):
+        cleaned = _clean_text(raw)
+        if not cleaned:
+            continue
+        lines.append(TenderSourceLine(source_reference=f"L{index}", text=cleaned, line_number=index))
     return lines
 
 
@@ -70,7 +82,11 @@ def _read_excel_file(path: Path) -> list[TenderSourceLine]:
     return lines
 
 
-def read_tender_document(path: str | Path, logger: logging.Logger | None = None) -> TenderDocument:
+def read_tender_document(
+    path: str | Path,
+    logger: logging.Logger | None = None,
+    config: AppConfig | None = None,
+) -> TenderDocument:
     """Read a local tender input source into normalized document lines."""
 
     source_path = Path(path)
@@ -87,6 +103,10 @@ def read_tender_document(path: str | Path, logger: logging.Logger | None = None)
     elif suffix == ".csv":
         lines = _read_csv_file(source_path)
         document_type = "csv"
+    elif suffix == ".pdf":
+        text = extract_text_from_pdf(str(source_path), config=config, logger=logger)
+        lines = _lines_from_text(text)
+        document_type = "pdf"
     else:
         lines = _read_excel_file(source_path)
         document_type = "excel"

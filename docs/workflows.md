@@ -35,18 +35,22 @@ py -3.11 -m src.main draft-boq --input tender\demo_tender_scope_only.txt --out o
    - `Draft BOQ Suggestions`
    - `Clarification Log`
 3. Confirm missing measurements, provisional wording, and unusual requirements before building a working BOQ.
+4. Treat `Draft BOQ Suggestions` as synthesized QS-style prompts, not raw clause dumps:
+   - section headings, definitions, references, and weak instruction-only text are filtered where possible
+   - wrapped/continued clause fragments are merged before drafting
+   - near-duplicate measurable work clauses are consolidated into one review-first BOQ candidate
 
-4. If a BOQ exists, run a tender-vs-BOQ gap check:
+5. If a BOQ exists, run a tender-vs-BOQ gap check:
 
 ```powershell
 py -3.11 -m src.main gap-check --input tender\demo_tender_notice.txt --boq boq\demo_boq.xlsx --out output\gap_check_demo.xlsx --json output\gap_check_demo.json
 ```
 
-5. Review:
+6. Review:
    - `BOQ Gap Report`
    - `Draft BOQ Suggestions`
    - `Clarification Log`
-6. Treat all gap findings as review-first. They are prompts for estimator/QS judgment, not final omissions.
+7. Treat all gap findings as review-first. They are prompts for estimator/QS judgment, not final omissions.
 
 ## Tender To Pricing Workflow
 
@@ -76,6 +80,27 @@ This:
 - no quantities are fabricated for tender-drafted rows
 - tender-drafted and gap-derived handoff rows remain flagged for review
 - existing BOQ rows are marked separately from tender-derived rows in `Pricing Handoff`
+
+## Internal Web App Workflow
+
+Run the app:
+
+```powershell
+py -3.11 -m streamlit run app.py
+```
+
+Pages available:
+- `Home / Overview` for quick context
+- `Tender Analysis` for tender review and downloads
+- `BOQ Pricing` for single-workbook pricing
+- `Tender -> Pricing` for the integrated review-first pipeline
+- `Database Tools` for validation and safe maintenance on a copied workbook
+- `Admin / Logs` for config and log preview
+
+UI behavior:
+- uploaded files are copied into a temporary working folder under `output/ui_runs`
+- the UI calls the existing Python engine and workflow modules directly
+- output workbooks and JSON files are returned as downloads from the browser
 
 ## Rate Ingestion Workflow
 
@@ -171,3 +196,32 @@ py -3.11 scripts\promote_approved.py --db database\qs_database.xlsx --json outpu
 - Use `ratelibrary` when the estimator has approved a rate that should become a live reusable database row.
 - Use `candidatematches` when the team wants to preserve the reviewed decision without promoting it into the live commercial library yet.
 - `ReviewLog` acts as the timestamped audit trail for approvals, rejections, promotions, and confidence overrides.
+
+## App Boundary Workflow
+
+Use the two Streamlit entry points as separate product surfaces over the same engine:
+
+- `app.py` is the staff-facing production app for workspace jobs, tender analysis, BOQ pricing, and tender-to-pricing using the current released production database snapshot
+- `admin_app.py` is the private owner/admin app for training/master database maintenance, candidate review merge/promotion, imports, and release management
+
+Release workflow:
+
+1. Maintain the training/master database in the admin app.
+2. Create a production release snapshot from `Release Management`.
+3. A versioned copy is written under `database/releases/`.
+4. The current production release pointer is updated.
+5. Staff pricing workflows automatically resolve that released database without needing re-upload.
+
+Normalized admin ingestion workflow:
+
+1. Open `Manual Ingestion` in `admin_app.py`.
+2. Upload and review a cost manual PDF before commit.
+3. Approved rows are appended into the Excel master database and into the normalized SQLite sidecar schema.
+4. Ingestion logs, optional aliases/category suggestions, and optional embeddings are stored in the sidecar schema for later admin review.
+5. Production still consumes released Excel snapshots, while the sidecar travels with the release when present.
+
+Matching feedback workflow:
+
+1. Run pricing in the admin app with `rule`, `hybrid`, or `ai` mode.
+2. Review the confidence preview table in the pricing UI.
+3. Log accepted and rejected item ids into the normalized `match_feedback` table for future tuning.
