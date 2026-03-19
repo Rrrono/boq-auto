@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 import math
 from typing import Any
 
@@ -68,23 +69,38 @@ class MatchingEngine:
     def __init__(
         self,
         mode: str = "rule",
+        config: Any | None = None,
         aliases: list[AliasEntry] | None = None,
         embedding_provider=None,
         embedding_lookup: dict[str, list[float]] | None = None,
         hybrid_ai_weight: float = 25.0,
         hybrid_weights: dict[str, float] | None = None,
+        logger: logging.Logger | None = None,
     ) -> None:
-        self.mode = mode
+        self.config = config
         self.aliases = aliases or []
         self.embedding_provider = embedding_provider
         self.embedding_lookup = embedding_lookup or {}
         self.hybrid_ai_weight = hybrid_ai_weight
+        self.logger = logger or logging.getLogger("boq_auto")
         self.hybrid_weights = hybrid_weights or {
             "semantic": 0.45,
             "alias": 0.20,
             "unit": 0.15,
             "keyword": 0.20,
         }
+        requested_mode = mode or str(config.get("matching.mode", "rule")) if config else mode
+        self.requested_mode = (requested_mode or "rule").strip().lower()
+        self.mode = self._resolve_mode(self.requested_mode)
+
+    def _resolve_mode(self, requested_mode: str) -> str:
+        if self.config is not None and not bool(self.config.get("ai.enabled", False)):
+            self.logger.info("ai_disabled | AI disabled -> using rule mode")
+            return "rule"
+        if requested_mode in {"ai", "hybrid"} and self.embedding_provider is None:
+            self.logger.warning("fallback_triggered | Embeddings unavailable -> fallback engaged")
+            return "rule"
+        return requested_mode or "rule"
 
     def match(self, query: str, items: list[Any]) -> list[MatchCandidate]:
         if self.mode == "ai":

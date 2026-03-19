@@ -10,7 +10,7 @@ import streamlit as st
 from src.cost_schema import schema_database_path
 from src.matching_engine import log_match_feedback
 
-from .helpers import create_work_dir, read_binary, read_json, resolve_input_file, safe_error_message
+from .helpers import create_work_dir, get_current_mode_label, read_binary, read_json, resolve_input_file, safe_error_message
 from .job_manager import get_active_job, run_tender_pricing
 
 
@@ -19,8 +19,10 @@ def _render_confidence_preview(runtime, audit_json_path: Path, db_path: Path, ke
         return
     payload = read_json(audit_json_path)
     results = list(payload.get("results", []))
+    actual_mode = str(payload.get("metadata", {}).get("matching_mode", "rule"))
     if not results:
         return
+    st.caption(f"Matching Mode: {get_current_mode_label(runtime.config, actual_mode)}")
     preview = pd.DataFrame(
         [
             {

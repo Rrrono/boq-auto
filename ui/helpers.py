@@ -148,6 +148,19 @@ def safe_error_message(exc: Exception) -> str:
     return message
 
 
+def get_current_mode_label(config: Any, actual_mode: str) -> str:
+    """Return a UI-friendly label for the actual matching mode in use."""
+
+    if not bool(config.get("ai.enabled", False)):
+        return "RULE (AI disabled)"
+    mode = str(actual_mode or "rule").strip().lower()
+    if mode == "hybrid":
+        return "HYBRID (fallback active)"
+    if mode == "ai":
+        return "AI (active)"
+    return "RULE"
+
+
 def pretty_json(payload: Any) -> str:
     """Render JSON for preview widgets."""
 

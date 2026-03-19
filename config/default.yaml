@@ -24,11 +24,14 @@ matching:
     unit: 0.15
     keyword: 0.20
 ai:
+  # API key must be set via environment variable, not stored here
   enabled: false
-  provider: disabled
+  provider: openai
+  model: text-embedding-3-small
   embedding_model: text-embedding-3-small
   enable_hash_fallback: true
   admin_ingestion_assist: false
+  use_env_key: true
 processing:
   apply_rates: false
   write_amount_formulas: true

@@ -142,9 +142,19 @@ Matching modes:
 - `hybrid` uses a weighted score across semantic similarity, alias hits, unit similarity, and keyword overlap
 - `ai` relies on embeddings and falls back safely when no provider/API key is available
 
+Configuration and AI safety:
+
+- BOQ AUTO loads configuration in layers: `config/default.yaml`, optional `config/local.yaml`, then environment variables with the `BOQ_AUTO_` prefix
+- `config/local.yaml` is intended for machine-local overrides and should not be committed
+- API keys are not stored in repo config; `OPENAI_API_KEY` must be provided through the environment if AI is enabled
+- when `ai.enabled` is `false`, the system stays fully operational in rule mode
+- when AI is enabled but embeddings are unavailable, matching falls back safely instead of failing
+- the admin UI can update non-secret AI settings in `config/local.yaml`, but it never writes API keys
+
 Admin controls:
 
 - `Manual Ingestion` in the admin app handles reviewed PDF ingestion into the master database
+- `Admin AI Control` lets the owner/admin enable or disable AI, switch matching mode, test AI safely, and manage embeddings without affecting production snapshots
 - structured ingestion now keeps trade/category, material, unit, and keywords in the normalized schema
 - optional admin-only AI assistance can suggest aliases and categories during ingestion
 - admin users can generate embeddings for the normalized schema database

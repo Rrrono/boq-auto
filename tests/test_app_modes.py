@@ -10,6 +10,7 @@ def test_production_app_hides_admin_training_features() -> None:
 
     assert "Database Tools" not in labels
     assert "Release Management" not in labels
+    assert "Admin AI Control" not in labels
     assert "Admin / Logs" not in labels
     assert "Workspace / Jobs" in labels
     assert "Tender Analysis" in labels
@@ -20,6 +21,7 @@ def test_admin_app_exposes_training_and_release_features() -> None:
     labels = page_labels_for_mode("admin")
 
     assert "Manual Ingestion" in labels
+    assert "Admin AI Control" in labels
     assert "Database Tools" in labels
     assert "Release Management" in labels
     assert "Admin / Logs" in labels

@@ -313,6 +313,49 @@ class CostDatabase:
             ).fetchall()
         return {str(code): list(json.loads(embedding_json)) for code, embedding_json in rows}
 
+    def clear_embeddings(self) -> int:
+        self.initialize()
+        with sqlite3.connect(self.path) as conn:
+            before = conn.execute("SELECT COUNT(*) FROM item_embeddings").fetchone()
+            conn.execute("DELETE FROM item_embeddings")
+        return int((before or [0])[0])
+
+    def fetch_embedding_stats(self) -> dict[str, Any]:
+        self.initialize()
+        with sqlite3.connect(self.path) as conn:
+            total_items = int((conn.execute("SELECT COUNT(*) FROM items").fetchone() or [0])[0])
+            embedded_items = int((conn.execute("SELECT COUNT(*) FROM item_embeddings").fetchone() or [0])[0])
+            last_updated = conn.execute("SELECT MAX(created_at) FROM item_embeddings").fetchone()
+        return {
+            "total_items": total_items,
+            "embedded_items": embedded_items,
+            "last_updated": str((last_updated or [""])[0] or ""),
+        }
+
+    def fetch_embedding_records(self, limit: int = 20) -> list[dict[str, Any]]:
+        self.initialize()
+        with sqlite3.connect(self.path) as conn:
+            rows = conn.execute(
+                """
+                SELECT items.code, items.description, item_embeddings.item_id, item_embeddings.model, item_embeddings.created_at
+                FROM item_embeddings
+                JOIN items ON items.id = item_embeddings.item_id
+                ORDER BY item_embeddings.created_at DESC
+                LIMIT ?
+                """,
+                (int(limit),),
+            ).fetchall()
+        return [
+            {
+                "code": str(row[0] or ""),
+                "description": str(row[1] or ""),
+                "item_id": str(row[2] or ""),
+                "model": str(row[3] or ""),
+                "created_at": str(row[4] or ""),
+            }
+            for row in rows
+        ]
+
     def log_match_feedback(self, query: str, selected_item_id: str, rejected_item_ids: list[str]) -> MatchFeedback:
         self.initialize()
         record = MatchFeedback(

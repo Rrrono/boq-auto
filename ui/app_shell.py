@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import streamlit as st
 
-from ui import admin_page, boq_pricing_page, database_tools_page, manual_ingestion_page, tender_analysis_page, tender_pricing_page, workspace_page
+from ui import admin_ai_panel, admin_page, boq_pricing_page, database_tools_page, manual_ingestion_page, tender_analysis_page, tender_pricing_page, workspace_page
 from ui.helpers import AppRuntime, build_runtime
 from ui.job_manager import get_active_job
 from ui.release_management_page import render as render_release_management
@@ -52,6 +52,7 @@ def page_labels_for_mode(app_mode: str) -> list[str]:
             "BOQ Pricing",
             "Tender -> Pricing",
             "Manual Ingestion",
+            "Admin AI Control",
             "Database Tools",
             "Release Management",
             "Admin / Logs",
@@ -75,6 +76,7 @@ def build_pages(runtime: AppRuntime) -> dict[str, PageRenderer]:
             "BOQ Pricing": lambda: boq_pricing_page.render(runtime),
             "Tender -> Pricing": lambda: tender_pricing_page.render(runtime),
             "Manual Ingestion": lambda: manual_ingestion_page.render(runtime),
+            "Admin AI Control": lambda: admin_ai_panel.render(runtime),
             "Database Tools": lambda: database_tools_page.render(runtime),
             "Release Management": lambda: render_release_management(runtime),
             "Admin / Logs": lambda: _render_admin_logs(runtime),

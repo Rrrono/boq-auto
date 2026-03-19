@@ -7,7 +7,7 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from .ai.embedding_provider import HashEmbeddingProvider, OpenAIEmbeddingProvider
+from .ai.embedding_provider import get_embedding_provider
 from .audit import export_unmatched_csv, write_audit_json
 from .buildup import price_build_up_recipe
 from .commercial import resolve_commercial_terms, resolve_regional_factor, summarize_quote
@@ -103,11 +103,13 @@ class PricingEngine:
             alias_bonus=float(self.config.get("matching.alias_bonus", 5)),
             unit_penalty=float(self.config.get("matching.unit_penalty", 18)),
         )
+        embedding_provider = get_embedding_provider(self.config)
         embedding_lookup = self._load_embedding_lookup(db_path) if matching_mode in {"ai", "hybrid"} else {}
         matching_engine = MatchingEngine(
             mode=matching_mode,
+            config=self.config,
             aliases=bundle.aliases,
-            embedding_provider=self._embedding_provider(matching_mode),
+            embedding_provider=embedding_provider,
             embedding_lookup=embedding_lookup,
             hybrid_ai_weight=float(self.config.get("matching.hybrid_ai_weight", 25)),
             hybrid_weights={
@@ -116,8 +118,10 @@ class PricingEngine:
                 "unit": float(self.config.get("matching.hybrid_weights.unit", 0.15)),
                 "keyword": float(self.config.get("matching.hybrid_weights.keyword", 0.20)),
             },
+            logger=self.logger,
         )
-        matcher = Matcher(bundle.rate_items, bundle.aliases, weights, matching_mode=matching_mode, matching_engine=matching_engine)
+        actual_mode = matching_engine.mode
+        matcher = Matcher(bundle.rate_items, bundle.aliases, weights, matching_mode=actual_mode, matching_engine=matching_engine)
         reader = WorkbookReader(self.config, self.logger)
         writer = WorkbookWriter()
 
@@ -201,7 +205,7 @@ class PricingEngine:
                     "db_path": db_path,
                     "boq_path": boq_path,
                     "region": region_value,
-                    "matching_mode": matching_mode,
+                    "matching_mode": actual_mode,
                     "commercial_terms": commercial_terms,
                     "quotation_summary": quotation_summary,
                 },
@@ -229,18 +233,6 @@ class PricingEngine:
         except Exception:
             self.logger.exception("Failed to load item embeddings from %s", sidecar_path)
             return {}
-
-    def _embedding_provider(self, matching_mode: str):
-        if matching_mode not in {"ai", "hybrid"}:
-            return None
-        provider_name = str(self.config.get("ai.provider", "disabled")).strip().lower()
-        if provider_name == "openai":
-            provider = OpenAIEmbeddingProvider(model=str(self.config.get("ai.embedding_model", "text-embedding-3-small")))
-            if provider.available():
-                return provider
-        if bool(self.config.get("ai.enable_hash_fallback", True)):
-            return HashEmbeddingProvider()
-        return None
 
     def validate_database(self, db_path: str) -> list[str]:
         """Validate workbook sheets and minimum required columns."""

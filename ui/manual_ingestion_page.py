@@ -9,8 +9,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from src.ai.embedding_provider import HashEmbeddingProvider, OpenAIEmbeddingProvider
-from src.cost_schema import CostDatabase, composed_embedding_text, schema_database_path
+from src.cost_schema import CostDatabase, schema_database_path
 from src.release_manager import master_database_path, release_summary
 from ui.helpers import create_work_dir, safe_error_message, save_uploaded_file
 
@@ -33,7 +32,6 @@ def _ensure_state() -> None:
     st.session_state.setdefault("filtered_items", [])
     st.session_state.setdefault("last_uploaded_file", "")
     st.session_state.setdefault("last_uploaded_signature", "")
-    st.session_state.setdefault("admin_ai_enabled", False)
     st.session_state.setdefault("admin_ingestion_ai_assist", False)
 
 
@@ -125,12 +123,6 @@ def render(runtime) -> None:
         st.info("Add `src.manual_parser` before using this admin page.")
         return
 
-    ai_enabled = st.checkbox(
-        "Enable AI matching features for admin tooling",
-        value=bool(st.session_state.get("admin_ai_enabled", runtime.config.get("ai.enabled", False))),
-        key="manual_ingestion_ai_toggle",
-    )
-    st.session_state["admin_ai_enabled"] = ai_enabled
     ai_ingestion_assist = st.checkbox(
         "Use AI-assisted alias/category suggestions during ingestion",
         value=bool(st.session_state.get("admin_ingestion_ai_assist", runtime.config.get("ai.admin_ingestion_assist", False))),
@@ -247,27 +239,6 @@ def render(runtime) -> None:
             except Exception as exc:
                 st.error(safe_error_message(exc))
 
-    with st.expander("AI Controls", expanded=False):
-        st.caption("These controls are admin-only. Production releases remain read-only.")
-        if st.button("Generate Embeddings For Schema Database", key="manual_ingestion_generate_embeddings", disabled=not ai_enabled):
-            try:
-                repository = CostDatabase(schema_path)
-                items = repository.fetch_items()
-                provider_name = str(runtime.config.get("ai.provider", "disabled")).strip().lower()
-                provider = OpenAIEmbeddingProvider(model=str(runtime.config.get("ai.embedding_model", "text-embedding-3-small"))) if provider_name == "openai" else HashEmbeddingProvider()
-                generated = 0
-                for item in items:
-                    embedding = provider.embed(composed_embedding_text(item))
-                    if not embedding:
-                        continue
-                    repository.save_embedding(item.id, embedding, getattr(provider, "model_name", "unknown"))
-                    generated += 1
-                st.success(f"Generated embeddings for {generated} item(s).")
-            except Exception as exc:
-                st.error(safe_error_message(exc))
-        if not ai_enabled:
-            st.info("AI tooling is off. Rule mode remains fully available.")
-
     with st.expander("Ingestion Logs", expanded=False):
         try:
             repository = CostDatabase(schema_path)
@@ -291,3 +262,5 @@ def render(runtime) -> None:
                 )
         except Exception as exc:
             st.error(safe_error_message(exc))
+
+    st.caption("Use the Admin AI Control page to change AI settings, test connectivity, or manage embeddings.")
