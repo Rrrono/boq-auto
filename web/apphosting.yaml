@@ -1,0 +1,16 @@
+# Firebase App Hosting configuration for the Next.js Phase 1 web app.
+# The app root should be set to `web` when creating the App Hosting backend.
+
+runConfig:
+  minInstances: 0
+  maxInstances: 3
+  concurrency: 40
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  - variable: BOQ_AUTO_API_BASE_URL
+    value: https://boq-auto-api-kwtvam3qtq-uc.a.run.app
+    availability:
+      - BUILD
+      - RUNTIME

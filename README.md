@@ -123,6 +123,8 @@ Available endpoints:
 - `POST /jobs/{job_id}/files`
 - `POST /jobs/{job_id}/price-boq`
 - `GET /jobs/{job_id}/results`
+- `GET /price-check`
+- `GET /knowledge/candidates`
 
 Example upload:
 
@@ -261,6 +263,16 @@ The current Phase 1 browser flow supports:
 - uploading a BOQ workbook against that job
 - triggering pricing from the job workspace
 - reviewing the latest pricing summary and first line-level results in the browser
+- reviewing recent price observations through the price checker
+- surfacing flagged and unmatched rows through the knowledge review queue
+
+Deploy the frontend with Firebase App Hosting:
+
+- frontend app root: [web](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/web)
+- app hosting config: [web/apphosting.yaml](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/web/apphosting.yaml)
+- local/frontend notes: [web/README.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/web/README.md)
+
+The official Firebase App Hosting setup expects you to connect a GitHub repository and choose the app root directory where `package.json` lives. In this repo, that directory is `web`.
 
 ## Windows Packaging
 
