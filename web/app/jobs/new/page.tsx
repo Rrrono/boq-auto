@@ -47,6 +47,24 @@ export default function NewJobPage() {
           <button type="submit">Create Job</button>
         </form>
       </section>
+      <section className="grid">
+        <article className="card">
+          <span className="pill">Intake</span>
+          <h3>What comes into a job</h3>
+          <p>
+            Start with the BOQ workbook, then add supporting tenders, specifications, manuals, and other source files as
+            the review flow expands.
+          </p>
+        </article>
+        <article className="card">
+          <span className="pill">Outcome</span>
+          <h3>What the team gets back</h3>
+          <p>
+            A tracked workspace with pricing runs, storage-backed artifacts, and a review surface for flagged lines and
+            future knowledge promotion.
+          </p>
+        </article>
+      </section>
     </div>
   );
 }

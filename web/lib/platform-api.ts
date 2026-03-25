@@ -1,4 +1,4 @@
-type JobFile = {
+export type JobFile = {
   id: number;
   file_type: string;
   filename: string;
@@ -7,7 +7,7 @@ type JobFile = {
   created_at: string;
 };
 
-type JobRun = {
+export type JobRun = {
   id: number;
   run_type: string;
   status: string;
@@ -54,6 +54,49 @@ export type PricingResult = {
     confidence_score: number;
     review_flag: boolean;
   }>;
+};
+
+export type PricingItem = PricingResult["items"][number];
+
+export type PriceObservation = {
+  job_id: string;
+  job_title: string;
+  region: string;
+  description: string;
+  matched_description: string;
+  unit: string;
+  rate: number;
+  amount: number | null;
+  decision: string;
+  confidence_score: number;
+};
+
+export type PriceCheckResponse = {
+  query: string;
+  scanned_jobs: number;
+  observed_rows: number;
+  filtered_rows: number;
+  average_rate: number | null;
+  observations: PriceObservation[];
+};
+
+export type KnowledgeCandidate = {
+  job_id: string;
+  job_title: string;
+  region: string;
+  description: string;
+  matched_description: string;
+  decision: string;
+  confidence_score: number;
+  review_flag: boolean;
+};
+
+export type KnowledgeQueueResponse = {
+  scanned_jobs: number;
+  candidate_count: number;
+  unmatched_count: number;
+  review_count: number;
+  candidates: KnowledgeCandidate[];
 };
 
 function apiBaseUrl() {
@@ -106,4 +149,17 @@ export async function priceJob(jobId: string): Promise<{ job: Job; pricing: Pric
   return apiFetch<{ job: Job; pricing: PricingResult }>(`/jobs/${jobId}/price-boq`, {
     method: "POST",
   });
+}
+
+export async function priceCheck(query = "", limit = 50): Promise<PriceCheckResponse> {
+  const params = new URLSearchParams();
+  if (query.trim()) {
+    params.set("q", query.trim());
+  }
+  params.set("limit", String(limit));
+  return apiFetch<PriceCheckResponse>(`/price-check?${params.toString()}`);
+}
+
+export async function getKnowledgeQueue(limit = 50): Promise<KnowledgeQueueResponse> {
+  return apiFetch<KnowledgeQueueResponse>(`/knowledge/candidates?limit=${limit}`);
 }

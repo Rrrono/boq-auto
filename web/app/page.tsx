@@ -19,6 +19,12 @@ const cards = [
 
 export default async function HomePage() {
   const jobs = await listJobs().catch(() => []);
+  const pricedJobs = jobs.filter((job) => job.runs.length > 0);
+  const totalFiles = jobs.reduce((sum, job) => sum + job.files.length, 0);
+  const totalRuns = jobs.reduce((sum, job) => sum + job.runs.length, 0);
+  const latestRun = pricedJobs
+    .flatMap((job) => job.runs)
+    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())[0];
 
   return (
     <div className="stack">
@@ -38,6 +44,24 @@ export default async function HomePage() {
             <p>{card.text}</p>
           </article>
         ))}
+      </section>
+      <section className="metaGrid">
+        <div className="metaRow">
+          <strong>Jobs tracked</strong>
+          <span>{jobs.length}</span>
+        </div>
+        <div className="metaRow">
+          <strong>Files received</strong>
+          <span>{totalFiles}</span>
+        </div>
+        <div className="metaRow">
+          <strong>Pricing runs</strong>
+          <span>{totalRuns}</span>
+        </div>
+        <div className="metaRow">
+          <strong>Latest run</strong>
+          <span>{latestRun ? new Date(latestRun.created_at).toLocaleString() : "No runs yet"}</span>
+        </div>
       </section>
       <section className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
@@ -59,6 +83,8 @@ export default async function HomePage() {
                   <th>Title</th>
                   <th>Region</th>
                   <th>Status</th>
+                  <th>Files</th>
+                  <th>Runs</th>
                   <th>Updated</th>
                 </tr>
               </thead>
@@ -70,6 +96,8 @@ export default async function HomePage() {
                     </td>
                     <td>{job.region}</td>
                     <td>{job.status}</td>
+                    <td>{job.files.length}</td>
+                    <td>{job.runs.length}</td>
                     <td>{new Date(job.updated_at).toLocaleString()}</td>
                   </tr>
                 ))}
@@ -77,6 +105,24 @@ export default async function HomePage() {
             </table>
           </div>
         )}
+      </section>
+      <section className="grid">
+        <article className="card">
+          <span className="pill">Review First</span>
+          <h3>What the platform does well right now</h3>
+          <p>
+            BOQ upload, pricing, artifact persistence, and job tracking are live. The browser layer now gives the team
+            a shared workspace instead of isolated command-line runs.
+          </p>
+        </article>
+        <article className="card">
+          <span className="pill">Next Layer</span>
+          <h3>What we’re building next</h3>
+          <p>
+            Better job review screens, a live price-check workflow, and a knowledge queue that surfaces flagged lines
+            before they become trusted estimating data.
+          </p>
+        </article>
       </section>
     </div>
   );

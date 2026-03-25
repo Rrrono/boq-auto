@@ -170,6 +170,11 @@ a {
   width: fit-content;
 }
 
+.form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .metaGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -216,6 +221,28 @@ th {
   border: 1px dashed var(--line);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.5);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #edf4ef;
+  color: var(--accent);
+}
+
+.helperText {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.monoText {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.85rem;
+  word-break: break-word;
 }
 
 @media (max-width: 920px) {

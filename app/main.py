@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from app.db import init_db
 from app.routes.boq import router as boq_router
 from app.routes.health import router as health_router
+from app.routes.insights import router as insights_router
 from app.routes.jobs import router as jobs_router
 
 
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(boq_router)
     app.include_router(jobs_router)
+    app.include_router(insights_router)
     return app
 
 

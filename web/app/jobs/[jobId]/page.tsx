@@ -33,6 +33,16 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
   const { jobId } = await params;
   const job = await getJob(jobId);
   const pricing = await getJobResults(jobId).catch(() => null);
+  const latestRun = job.runs[0] ?? null;
+  const boqFile = job.files.find((file) => file.file_type === "boq") ?? null;
+  const matchedPercent =
+    pricing && pricing.summary.item_count > 0
+      ? Math.round((pricing.summary.matched_count / pricing.summary.item_count) * 100)
+      : null;
+  const flaggedPercent =
+    pricing && pricing.summary.item_count > 0
+      ? Math.round((pricing.summary.flagged_count / pricing.summary.item_count) * 100)
+      : null;
 
   return (
     <div className="stack">
@@ -47,7 +57,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
       <section className="metaGrid">
         <div className="metaRow">
           <strong>Status</strong>
-          <span>{job.status}</span>
+          <span className="statusPill">{job.status}</span>
         </div>
         <div className="metaRow">
           <strong>Files</strong>
@@ -66,7 +76,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
       <section className="grid">
         <article className="card">
           <span className="pill">Upload</span>
-          <h3>Attach BOQ workbook</h3>
+          <h3>Attach source file</h3>
           <form className="form" action={uploadBoqAction}>
             <input type="hidden" name="jobId" value={job.id} />
             <label>
@@ -75,14 +85,25 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
             </label>
             <button type="submit">Upload BOQ</button>
           </form>
+          <p className="helperText">
+            Phase 1 pricing uses the latest uploaded BOQ workbook. Tender/spec/manual uploads can be added next through
+            the same job model.
+          </p>
         </article>
         <article className="card">
           <span className="pill">Run</span>
           <h3>Price the uploaded BOQ</h3>
           <form className="form" action={priceBoqAction}>
             <input type="hidden" name="jobId" value={job.id} />
-            <button type="submit">Run Pricing</button>
+            <button type="submit" disabled={!boqFile}>
+              Run Pricing
+            </button>
           </form>
+          <p className="helperText">
+            {boqFile
+              ? `Latest BOQ: ${boqFile.filename}`
+              : "Upload a BOQ workbook first, then trigger pricing from this workspace."}
+          </p>
         </article>
       </section>
 
@@ -111,12 +132,41 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
                   <tr key={file.id}>
                     <td>{file.file_type}</td>
                     <td>{file.filename}</td>
-                    <td>{file.storage_uri}</td>
+                    <td className="monoText">{file.storage_uri}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+
+      <section className="card">
+        <span className="pill">Run History</span>
+        <h3>Latest execution</h3>
+        {latestRun ? (
+          <>
+            <div className="metaGrid">
+              <div className="metaRow">
+                <strong>Run type</strong>
+                <span>{latestRun.run_type}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Status</strong>
+                <span className="statusPill">{latestRun.status}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Output workbook</strong>
+                <span className="monoText">{latestRun.output_storage_uri || "-"}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Audit JSON</strong>
+                <span className="monoText">{latestRun.audit_storage_uri || "-"}</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="emptyState">No runs yet. This panel will show the latest workbook and audit artifact URIs.</div>
         )}
       </section>
 
@@ -144,15 +194,25 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
                 <strong>Flagged</strong>
                 <span>{pricing.summary.flagged_count}</span>
               </div>
+              <div className="metaRow">
+                <strong>Matched rate</strong>
+                <span>{matchedPercent === null ? "-" : `${matchedPercent}%`}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Review pressure</strong>
+                <span>{flaggedPercent === null ? "-" : `${flaggedPercent}%`}</span>
+              </div>
             </div>
             <div className="tableWrap">
               <table>
                 <thead>
                   <tr>
                     <th>Description</th>
+                    <th>Unit</th>
                     <th>Decision</th>
                     <th>Match</th>
                     <th>Rate</th>
+                    <th>Amount</th>
                     <th>Confidence</th>
                   </tr>
                 </thead>
@@ -160,15 +220,21 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
                   {pricing.items.slice(0, 20).map((item, index) => (
                     <tr key={`${item.description}-${index}`}>
                       <td>{item.description}</td>
+                      <td>{item.unit || "-"}</td>
                       <td>{item.decision}</td>
                       <td>{item.matched_description || "-"}</td>
                       <td>{item.rate ?? "-"}</td>
+                      <td>{item.amount ?? "-"}</td>
                       <td>{item.confidence_score.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <p className="helperText">
+              Showing the first 20 priced rows. Later iterations should add full filtering for matched, review, and
+              unmatched decisions.
+            </p>
           </>
         ) : (
           <div className="emptyState">No pricing run yet. Upload a BOQ and run pricing to populate this panel.</div>
