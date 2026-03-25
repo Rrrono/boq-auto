@@ -41,10 +41,12 @@ def test_insert_items_and_embeddings(tmp_path) -> None:
     item = build_cost_item("A1", "Excavation", "m3", "earthworks", "", "soil", ["excavation", "trench"], 1000.0, source.id)
     repository.insert_items([item])
     repository.save_embedding(item.id, [0.1, 0.2, 0.3], "hash-local-v1")
-    repository.log_match_feedback("excavate trench", item.id, ["A2"])
+    repository.log_match_feedback("excavate trench", item.id, "accepted")
 
     lookup = repository.fetch_embedding_lookup()
     assert lookup["A1"] == [0.1, 0.2, 0.3]
-    assert repository.fetch_match_feedback()[0].selected_item_id == item.id
+    feedback = repository.fetch_match_feedback()[0]
+    assert feedback.selected_item_id == item.id
+    assert feedback.action == "accepted"
     assert composed_embedding_text(item) == "earthworks | soil | Excavation | m3"
     assert repository.resolve_item_id("A1") == item.id

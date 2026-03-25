@@ -61,6 +61,11 @@ Run the private owner/admin app:
 py -3.11 -m streamlit run admin_app.py
 ```
 
+Packaged launcher entrypoints are also available for Windows `.exe` builds:
+
+- [launch_production.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/launch_production.py)
+- [launch_admin.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/launch_admin.py)
+
 Which app to use:
 
 - `app.py` is the production app for colleagues doing day-to-day tender review, workspace management, and pricing
@@ -88,6 +93,134 @@ Admin app pages:
 - Admin / Logs
 
 The production app intentionally does not expose training/database mutation tools such as imports, normalization, deduplication, review promotion, or release controls.
+
+## Cloud API MVP
+
+BOQ AUTO also includes a minimal FastAPI backend for stateless BOQ processing on platforms such as Google Cloud Run.
+
+Cloud API structure:
+
+- [app/main.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/main.py) FastAPI entrypoint
+- [app/routes/health.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/routes/health.py) health check route
+- [app/routes/boq.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/routes/boq.py) upload route
+- [app/services/file_parser.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/services/file_parser.py) in-memory workbook parsing
+- [app/services/cost_engine.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/services/cost_engine.py) in-memory pricing and workbook response generation
+- [app/models/boq.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/models/boq.py) API response models
+
+Run locally:
+
+```powershell
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+
+Available endpoints:
+
+- `GET /health`
+- `POST /upload-boq`
+- `POST /jobs`
+- `GET /jobs`
+- `GET /jobs/{job_id}`
+- `POST /jobs/{job_id}/files`
+- `POST /jobs/{job_id}/price-boq`
+- `GET /jobs/{job_id}/results`
+
+Example upload:
+
+```powershell
+curl -X POST "http://127.0.0.1:8080/upload-boq" `
+  -F "file=@boq\sample.xlsx" `
+  -F "region=Nairobi" `
+  -F "response_format=json"
+```
+
+Cloud notes:
+
+- uploads are processed in memory using `BytesIO`
+- no persistent local storage is required for request handling
+- the API now prices against the existing BOQ AUTO workbook engine and current production database snapshot
+- the pricing database defaults to the released production snapshot; override it with `BOQ_AUTO_API_DB_PATH` if needed
+- if `BOQ_AUTO_GCS_BUCKET` is set, uploaded inputs, processed workbooks, and audit JSON can be persisted to Google Cloud Storage and returned as `gs://` URIs in the API response
+- for a harder production setup, set `BOQ_AUTO_API_DB_GCS_URI` so the service loads the pricing workbook from GCS instead of relying on a database baked into the image
+- if you use the SQLite sidecar too, set `BOQ_AUTO_API_DB_SIDECAR_GCS_URI` alongside the workbook URI
+- Cloud Run instances cache the downloaded runtime database under `/tmp/boq_auto_runtime_db` and can be forced to refresh it with `BOQ_AUTO_API_DB_REFRESH=true`
+- the service is designed to be extended with Google Cloud Storage and Firestore/PostgreSQL without changing the API shape
+
+Cloud Run deployment files:
+
+- [cloudbuild.yaml](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/cloudbuild.yaml)
+- [scripts/deploy_cloud_run.ps1](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/scripts/deploy_cloud_run.ps1)
+
+Example Windows deployment:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\deploy_cloud_run.ps1 `
+  -ProjectId "your-gcp-project-id" `
+  -Region "us-central1" `
+  -ServiceName "boq-auto-api" `
+  -BucketName "your-boq-auto-bucket"
+```
+
+## Web Platform Slice
+
+The repo now also includes the first internal-first web platform slice:
+
+- [app/db.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/db.py) SQLAlchemy database setup
+- [app/orm_models.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/orm_models.py) core Phase 1 tables for jobs, files, and pricing runs
+- [app/routes/jobs.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/app/routes/jobs.py) job workflow API
+- [web](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/web) Next.js frontend shell
+
+Current scope of this slice:
+
+- create a job with title and region
+- upload a BOQ against that job
+- price the uploaded BOQ through the existing pricing engine
+- persist job metadata, file metadata, and pricing run metadata
+- return the latest pricing results through the job API
+
+## Windows Packaging
+
+BOQ AUTO can be deployed on Windows with:
+
+- packaged launcher executables for day-to-day use
+- an installer that places the production and admin launchers on the machine
+
+Recommended deployment shape:
+
+- build `BOQ AUTO.exe` for the staff-facing production app
+- build `BOQ AUTO Admin.exe` for the private admin app
+- install both through a Windows installer so users get desktop/start-menu shortcuts
+
+Packaging files included in the repo:
+
+- [src/launcher.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/src/launcher.py) shared Streamlit launcher helper
+- [launch_production.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/launch_production.py) packaged production launcher entrypoint
+- [launch_admin.py](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/launch_admin.py) packaged admin launcher entrypoint
+- [packaging/boq_auto_production.spec](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/packaging/boq_auto_production.spec) PyInstaller spec for the production launcher
+- [packaging/boq_auto_admin.spec](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/packaging/boq_auto_admin.spec) PyInstaller spec for the admin launcher
+- [packaging/boq_auto_installer.iss](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/packaging/boq_auto_installer.iss) Inno Setup installer skeleton
+- [scripts/build_windows_dist.ps1](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/scripts/build_windows_dist.ps1) helper build script
+
+Build the packaged launchers:
+
+```powershell
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File scripts\build_windows_dist.ps1
+```
+
+This produces PyInstaller folder-style distributions under:
+
+```text
+dist\BOQ AUTO Production\
+dist\BOQ AUTO Admin\
+```
+
+If you use Inno Setup, point it at [packaging/boq_auto_installer.iss](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/packaging/boq_auto_installer.iss) after the PyInstaller build completes.
+
+Important deployment notes:
+
+- Tesseract OCR is still an external runtime dependency unless you decide to package/install it separately
+- `OPENAI_API_KEY` should still be provided through the environment on admin machines if AI is enabled
+- writable operational data such as logs, outputs, and workspace jobs should remain outside the frozen application logic where possible
 
 ## Database Release Workflow
 
@@ -141,6 +274,7 @@ Matching modes:
 - `rule` keeps the existing fuzzy/rule-based behavior and remains the default
 - `hybrid` uses a weighted score across semantic similarity, alias hits, unit similarity, and keyword overlap
 - `ai` relies on embeddings and falls back safely when no provider/API key is available
+- the learning loop is rule-based and database-driven; accepted, rejected, and corrected matches can bias future matching without model retraining
 
 Configuration and AI safety:
 
@@ -161,6 +295,7 @@ Admin controls:
 - embeddings are generated from `trade | material | description | unit`
 - admin users can review ingestion logs from the schema sidecar
 - admin users can log match feedback for future tuning from pricing UI previews
+- `Manual Ingestion` also shows learning insights such as top corrected queries, most rejected items, and most accepted items, with optional feedback export/clear actions
 
 ## Workspace Jobs
 

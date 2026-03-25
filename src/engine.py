@@ -12,6 +12,7 @@ from .audit import export_unmatched_csv, write_audit_json
 from .buildup import price_build_up_recipe
 from .commercial import resolve_commercial_terms, resolve_regional_factor, summarize_quote
 from .cost_schema import CostDatabase, schema_database_path
+from .learning_engine import LearningEngine
 from .matching_engine import MatchingEngine
 from .matcher import Matcher, MatchingWeights
 from .models import (
@@ -102,9 +103,11 @@ class PricingEngine:
             unit_bonus=float(self.config.get("matching.unit_bonus", 6)),
             alias_bonus=float(self.config.get("matching.alias_bonus", 5)),
             unit_penalty=float(self.config.get("matching.unit_penalty", 18)),
+            attribute_bonus=float(self.config.get("matching.attribute_bonus", 6)),
         )
         embedding_provider = get_embedding_provider(self.config)
         embedding_lookup = self._load_embedding_lookup(db_path) if matching_mode in {"ai", "hybrid"} else {}
+        learning_engine = self._load_learning_engine(db_path)
         matching_engine = MatchingEngine(
             mode=matching_mode,
             config=self.config,
@@ -118,6 +121,7 @@ class PricingEngine:
                 "unit": float(self.config.get("matching.hybrid_weights.unit", 0.15)),
                 "keyword": float(self.config.get("matching.hybrid_weights.keyword", 0.20)),
             },
+            learning_engine=learning_engine,
             logger=self.logger,
         )
         actual_mode = matching_engine.mode
@@ -233,6 +237,16 @@ class PricingEngine:
         except Exception:
             self.logger.exception("Failed to load item embeddings from %s", sidecar_path)
             return {}
+
+    def _load_learning_engine(self, db_path: str) -> LearningEngine | None:
+        sidecar_path = schema_database_path(db_path)
+        if not sidecar_path.exists():
+            return None
+        try:
+            return LearningEngine.from_schema(sidecar_path)
+        except Exception:
+            self.logger.exception("Failed to load match feedback from %s", sidecar_path)
+            return None
 
     def validate_database(self, db_path: str) -> list[str]:
         """Validate workbook sheets and minimum required columns."""

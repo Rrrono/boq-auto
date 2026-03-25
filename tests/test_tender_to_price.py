@@ -20,6 +20,7 @@ class FakePricingEngine:
         threshold: float | None = None,
         apply_rates: bool | None = None,
         column_overrides: dict[str, int] | None = None,
+        matching_mode: str = "rule",
     ) -> RunArtifacts:
         workbook = load_workbook(boq_path)
         workbook.save(output_path)
@@ -100,3 +101,21 @@ def test_tender_price_run_generates_integrated_workbook_with_boq(tmp_path) -> No
     assert "Pricing Handoff" in workbook.sheetnames
     assert "Tender Analysis Summary" in workbook.sheetnames
     assert "BOQ Gap Report" in workbook.sheetnames
+
+
+def test_pricing_handoff_preserves_spec_attributes() -> None:
+    config = load_config()
+    runner = TenderToPriceRunner(
+        config,
+        logging.getLogger("test"),
+        tender_workflow=TenderWorkflow(config),
+        pricing_engine=FakePricingEngine(),
+    )
+    result = runner.tender_workflow.prepare_result("tender/demo_tender_scope_only.txt", include_gap_check=True)
+    result.draft_suggestions[0].spec_attributes = "Type: LED; Size: 600 x 600"
+
+    rows = runner.build_pricing_handoff_rows(result, boq_path=None)
+
+    tender_rows = [row for row in rows if row.source_origin == "tender_draft" and row.spec_attributes]
+    assert tender_rows
+    assert "600 x 600" in tender_rows[0].spec_attributes

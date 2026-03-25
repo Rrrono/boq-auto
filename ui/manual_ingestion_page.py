@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 import inspect
+import json
 from typing import Any
 
 import pandas as pd
 import streamlit as st
 
 from src.cost_schema import CostDatabase, schema_database_path
+from src.learning_engine import LearningEngine
+from src.utils import safe_float
 from src.release_manager import master_database_path, release_summary
 from ui.helpers import create_work_dir, safe_error_message, save_uploaded_file
 
@@ -56,6 +59,11 @@ def _coerce_row(item: Any, row_id: int) -> dict[str, Any]:
         "Item Name": _get_value(item, "item_name", "name", "title"),
         "Unit": _get_value(item, "unit", "uom"),
         "Description": _get_value(item, "description", "details", "notes"),
+        "Rate": _get_value(item, "rate"),
+        "Category": _get_value(item, "category", "section"),
+        "Material": _get_value(item, "material"),
+        "Keywords": ", ".join(getattr(item, "keywords", [])) if hasattr(item, "keywords") and isinstance(getattr(item, "keywords"), list) else _get_value(item, "keywords"),
+        "Aliases": ", ".join(getattr(item, "aliases", [])) if hasattr(item, "aliases") and isinstance(getattr(item, "aliases"), list) else _get_value(item, "aliases"),
     }
 
 
@@ -74,6 +82,11 @@ def _manual_item_from_row(row: dict[str, Any]) -> Any:
         "description": str(row.get("Description") or "").strip(),
         "details": str(row.get("Description") or "").strip(),
         "notes": str(row.get("Description") or "").strip(),
+        "rate": safe_float(row.get("Rate")) or 0.0,
+        "category": str(row.get("Category") or "").strip(),
+        "material": str(row.get("Material") or "").strip(),
+        "keywords": [value.strip() for value in str(row.get("Keywords") or "").split(",") if value.strip()],
+        "aliases": [value.strip() for value in str(row.get("Aliases") or "").split(",") if value.strip()],
     }
     signature = inspect.signature(ManualItem)
     kwargs = {}
@@ -104,9 +117,11 @@ def _apply_filters(rows: list[dict[str, Any]], search_text: str, unit_value: str
 def _update_master_rows(edited_df: pd.DataFrame, parsed_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     parsed_by_id = {int(row["_row_id"]): dict(row) for row in parsed_rows}
     for row_id, values in edited_df.iterrows():
+        existing = dict(parsed_by_id.get(int(row_id), {}))
         row_payload = values.to_dict()
         row_payload["_row_id"] = int(row_id)
-        parsed_by_id[int(row_id)] = row_payload
+        existing.update(row_payload)
+        parsed_by_id[int(row_id)] = existing
     return [parsed_by_id[row_id] for row_id in sorted(parsed_by_id)]
 
 
@@ -260,6 +275,45 @@ def render(runtime) -> None:
                     ),
                     use_container_width=True,
                 )
+        except Exception as exc:
+            st.error(safe_error_message(exc))
+
+    with st.expander("Learning Insights", expanded=False):
+        try:
+            repository = CostDatabase(schema_path)
+            learning = LearningEngine(repository.fetch_match_feedback())
+            insights = learning.feedback_insights()
+            insight_cols = st.columns(3)
+            with insight_cols[0]:
+                st.caption("Top corrected queries")
+                if insights["top_corrected_queries"]:
+                    st.dataframe(pd.DataFrame(insights["top_corrected_queries"]), use_container_width=True)
+                else:
+                    st.caption("No corrected feedback yet.")
+            with insight_cols[1]:
+                st.caption("Most rejected items")
+                if insights["most_rejected_items"]:
+                    st.dataframe(pd.DataFrame(insights["most_rejected_items"]), use_container_width=True)
+                else:
+                    st.caption("No rejected feedback yet.")
+            with insight_cols[2]:
+                st.caption("Most accepted items")
+                if insights["most_accepted_items"]:
+                    st.dataframe(pd.DataFrame(insights["most_accepted_items"]), use_container_width=True)
+                else:
+                    st.caption("No accepted feedback yet.")
+            export_payload = learning.export_learning_data()
+            st.download_button(
+                "Export Learning Data",
+                data=json.dumps(export_payload, indent=2, ensure_ascii=True),
+                file_name="learning_feedback_export.json",
+                mime="application/json",
+                key="manual_ingestion_export_learning_data",
+            )
+            clear_confirm = st.checkbox("I understand clearing feedback history is permanent", key="manual_ingestion_clear_feedback_confirm")
+            if st.button("Clear Feedback History", key="manual_ingestion_clear_feedback", disabled=not clear_confirm):
+                removed = repository.clear_match_feedback()
+                st.success(f"Cleared {removed} feedback record(s).")
         except Exception as exc:
             st.error(safe_error_message(exc))
 

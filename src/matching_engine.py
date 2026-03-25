@@ -10,6 +10,7 @@ from typing import Any
 from rapidfuzz import fuzz
 
 from src.cost_schema import CostDatabase
+from src.learning_engine import LearningEngine
 from src.models import AliasEntry
 from src.normalizer import normalize_text, normalize_unit
 
@@ -75,6 +76,7 @@ class MatchingEngine:
         embedding_lookup: dict[str, list[float]] | None = None,
         hybrid_ai_weight: float = 25.0,
         hybrid_weights: dict[str, float] | None = None,
+        learning_engine: LearningEngine | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         self.config = config
@@ -82,6 +84,7 @@ class MatchingEngine:
         self.embedding_provider = embedding_provider
         self.embedding_lookup = embedding_lookup or {}
         self.hybrid_ai_weight = hybrid_ai_weight
+        self.learning_engine = learning_engine
         self.logger = logger or logging.getLogger("boq_auto")
         self.hybrid_weights = hybrid_weights or {
             "semantic": 0.45,
@@ -119,6 +122,9 @@ class MatchingEngine:
             partial_score = fuzz.partial_ratio(normalized_query, description)
             score = (sort_score * 0.45) + (set_score * 0.35) + (partial_score * 0.20)
             rationale = [f"rule={score:.1f}", f"sort={sort_score:.1f}", f"set={set_score:.1f}"]
+            learning_adjustment, learning_notes = self.learning_adjustment(normalized_query, _item_code(item))
+            score += learning_adjustment
+            rationale.extend(learning_notes)
             ranked.append(MatchCandidate(item=item, score=round(score, 2), mode="rule", rationale=rationale))
         return sorted(ranked, key=lambda candidate: candidate.score, reverse=True)
 
@@ -171,15 +177,23 @@ class MatchingEngine:
                 + keyword_component * self.hybrid_weights.get("keyword", 0.20)
             )
             combined_score = round(combined * 100.0, 2)
+            learning_adjustment, learning_notes = self.learning_adjustment(normalized_query, code)
+            combined_score += learning_adjustment
             rationale = [
                 f"semantic={semantic_component:.3f}",
                 f"alias={alias_component:.3f}",
                 f"unit={unit_component:.3f}",
                 f"keyword={keyword_component:.3f}",
             ]
+            rationale.extend(learning_notes)
             rationale.extend(candidate.rationale)
             ranked.append(MatchCandidate(item=candidate.item, score=round(combined_score, 2), mode="hybrid", rationale=rationale))
         return sorted(ranked, key=lambda candidate: candidate.score, reverse=True)
+
+    def learning_adjustment(self, query: str, item_id: str) -> tuple[float, list[str]]:
+        if self.learning_engine is None or not item_id:
+            return 0.0, []
+        return self.learning_engine.query_adjustment(query, item_id)
 
     def _apply_aliases(self, query: str) -> str:
         normalized = normalize_text(query)
@@ -231,10 +245,21 @@ class MatchingEngine:
         return ""
 
 
-def log_match_feedback(schema_path: str, query: str, selected_item_id: str, rejected_item_ids: list[str]) -> None:
+def log_match_feedback(
+    schema_path: str,
+    query_text: str,
+    selected_item_id: str,
+    action: str,
+    alternative_item_id: str | None = None,
+) -> None:
     """Persist UI feedback for future tuning without affecting current matching behavior."""
 
     repository = CostDatabase(schema_path)
     selected_resolved = repository.resolve_item_id(selected_item_id) or selected_item_id
-    rejected_resolved = [repository.resolve_item_id(item_id) or item_id for item_id in rejected_item_ids]
-    repository.log_match_feedback(query=query, selected_item_id=selected_resolved, rejected_item_ids=rejected_resolved)
+    alternative_resolved = repository.resolve_item_id(alternative_item_id or "") or str(alternative_item_id or "")
+    repository.log_match_feedback(
+        query_text=query_text,
+        item_id=selected_resolved,
+        action=str(action or "").strip().lower() or "accepted",
+        alternative_item_id=alternative_resolved,
+    )

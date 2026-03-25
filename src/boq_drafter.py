@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import logging
 import re
 
+from .ai.embedding_provider import get_embedding_provider
 from .models import AppConfig
 from .normalizer import normalize_text
 from .tender_models import DraftBOQSuggestion, ScopeSection, TenderDocument, TenderSourceLine
@@ -20,6 +21,7 @@ class _DraftCandidate:
     section: str
     description: str
     unit: str
+    spec_attributes: str
     source_references: list[str]
     source_basis_parts: list[str]
     source_excerpt_parts: list[str]
@@ -64,6 +66,7 @@ WORK_VERBS = {
     "construct", "lay", "install", "cast", "form", "reinforce", "paint",
     "plaster", "screed", "tile", "pave", "bench", "prepare",
 }
+AI_CHUNK_SPLIT_PATTERN = re.compile(r"(?:(?<=[.;:])\s+|\s*,\s*(?=including|with|complete with|together with)\s*)", re.IGNORECASE)
 
 
 class BOQDrafter:
@@ -72,6 +75,8 @@ class BOQDrafter:
     def __init__(self, config: AppConfig, logger: logging.Logger | None = None) -> None:
         self.config = config
         self.logger = logger
+        self.ai_extraction_enabled = bool(config.get("ai.enabled", False)) and bool(config.get("ai.tender_extraction_assist", False))
+        self.embedding_provider = get_embedding_provider(config) if self.ai_extraction_enabled else None
         raw_units: dict[str, str] = config.get("tender_analysis.draft_units", {})
         self.config_units = {
             normalize_text(key).replace(" ", "_"): str(value)
@@ -140,17 +145,25 @@ class BOQDrafter:
             if self._should_filter_clause(text):
                 continue
             synthesized = self._synthesize_descriptions(section.section_name, text)
+            ai_synthesized = self._ai_synthesize_descriptions(section.section_name, text)
+            if ai_synthesized:
+                existing_descriptions = {normalize_text(description) for description, _, _, _, _ in synthesized}
+                for candidate in ai_synthesized:
+                    if normalize_text(candidate[0]) in existing_descriptions:
+                        continue
+                    synthesized.append(candidate)
             if not synthesized:
                 if self._looks_like_measurable_work(text):
-                    synthesized = [(self._fallback_description(text), "", 58.0, "Measured work wording detected but item wording is still broad.")]
+                    synthesized = [(self._fallback_description(text), "", "", 58.0, "Measured work wording detected but item wording is still broad.")]
                 else:
                     continue
-            for description, unit, confidence, note in synthesized:
+            for description, unit, spec_attributes, confidence, note in synthesized:
                 candidates.append(
                     _DraftCandidate(
                         section=section.section_name,
                         description=description,
                         unit=self._suggest_unit(section.section_name, description, unit, text),
+                        spec_attributes=spec_attributes,
                         source_references=[source_reference],
                         source_basis_parts=[f"Tender text matched via {', '.join(section.matched_keywords)}"],
                         source_excerpt_parts=[text],
@@ -178,6 +191,8 @@ class BOQDrafter:
             existing.confidence = min(max(existing.confidence, candidate.confidence) + 2.0, 90.0)
             if not existing.unit and candidate.unit:
                 existing.unit = candidate.unit
+            if not existing.spec_attributes and candidate.spec_attributes:
+                existing.spec_attributes = candidate.spec_attributes
 
         suggestions: list[DraftBOQSuggestion] = []
         for candidate in consolidated.values():
@@ -195,6 +210,7 @@ class BOQDrafter:
                     source_basis=" | ".join(dict.fromkeys(candidate.source_basis_parts)),
                     source_reference=", ".join(dict.fromkeys(candidate.source_references)),
                     source_excerpt=" | ".join(dict.fromkeys(candidate.source_excerpt_parts))[:500],
+                    spec_attributes=candidate.spec_attributes,
                     confidence=round(candidate.confidence, 1),
                     notes=notes,
                 )
@@ -212,6 +228,7 @@ class BOQDrafter:
             source_basis=f"Scope section inferred from keywords: {', '.join(section.matched_keywords)}",
             source_reference=", ".join(section.source_references),
             source_excerpt=section.notes,
+            spec_attributes="",
             confidence=max(50.0, min(section.confidence - 5.0, 80.0)),
             notes="Section-level placeholder because no clear line-item wording was found.",
         )
@@ -297,9 +314,9 @@ class BOQDrafter:
             return True
         return any(f" {verb}" in f" {lowered}" for verb in WORK_VERBS)
 
-    def _synthesize_descriptions(self, section_name: str, text: str) -> list[tuple[str, str, float, str]]:
+    def _synthesize_descriptions(self, section_name: str, text: str) -> list[tuple[str, str, str, float, str]]:
         lowered = text.lower()
-        suggestions: list[tuple[str, str, float, str]] = []
+        suggestions: list[tuple[str, str, str, float, str]] = []
         seen: set[str] = set()
         matched_keys = {
             key
@@ -319,11 +336,65 @@ class BOQDrafter:
             confidence = 68.0
             if section_name.lower() in description.lower():
                 confidence += 2.0
-            suggestions.append((description, unit, confidence, note))
+            suggestions.append((description, unit, "", confidence, note))
 
         if suggestions:
             return suggestions[:4]
         return []
+
+    def _ai_synthesize_descriptions(self, section_name: str, text: str) -> list[tuple[str, str, str, float, str]]:
+        if self.embedding_provider is None or not hasattr(self.embedding_provider, "extract_boq_items"):
+            return []
+        if not self._looks_like_measurable_work(text):
+            return []
+        items: list[dict] = []
+        for chunk in self._chunk_ai_text(text):
+            try:
+                chunk_items = self.embedding_provider.extract_boq_items(chunk, section=section_name)
+            except Exception:
+                continue
+            if chunk_items:
+                items.extend(chunk_items)
+        suggestions: list[tuple[str, str, str, float, str]] = []
+        seen: set[str] = set()
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            description = " ".join(str(item.get("description", "") or "").split()).strip()
+            if not description:
+                continue
+            normalized_description = normalize_text(description)
+            if normalized_description in seen:
+                continue
+            seen.add(normalized_description)
+            unit = str(item.get("unit", "") or "").strip()
+            reason = str(item.get("reason", "") or "").strip() or "AI-assisted structured extraction from tender clause."
+            attributes = [str(value).strip() for value in item.get("attributes", []) if str(value).strip()]
+            attribute_text = "; ".join(dict.fromkeys(attributes))
+            suggestions.append((description, unit, attribute_text, 61.0, reason))
+        return suggestions[:4]
+
+    def _chunk_ai_text(self, text: str) -> list[str]:
+        cleaned = " ".join(str(text or "").split()).strip()
+        if not cleaned:
+            return []
+        if len(cleaned) <= 220:
+            return [cleaned]
+        parts = [part.strip(" ,;:.") for part in AI_CHUNK_SPLIT_PATTERN.split(cleaned) if part and part.strip(" ,;:.")]
+        if not parts:
+            return [cleaned]
+        chunks: list[str] = []
+        current = ""
+        for part in parts:
+            candidate = f"{current}; {part}".strip("; ") if current else part
+            if current and len(candidate) > 220:
+                chunks.append(current)
+                current = part
+            else:
+                current = candidate
+        if current:
+            chunks.append(current)
+        return chunks[:4] or [cleaned]
 
     def _fallback_description(self, text: str) -> str:
         cleaned = _clean_line_text(text)

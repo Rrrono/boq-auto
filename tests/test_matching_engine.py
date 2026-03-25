@@ -109,3 +109,47 @@ def test_hybrid_matching_uses_unit_and_keyword_signals() -> None:
     results = engine.match("excavation trench m3", [first, second])
 
     assert results[0].item.item_code == "A1"
+
+
+def test_openai_provider_normalizes_structured_ingestion_suggestions(monkeypatch) -> None:
+    provider = OpenAIEmbeddingProvider(api_key="test-key", task_model="gpt-4.1-mini")
+    monkeypatch.setattr(
+        provider,
+        "_complete_json",
+        lambda system_prompt, user_prompt: {
+            "aliases": ["soil excavation", "Soil Excavation", "Excavate trench soil"],
+            "category": "earthworks",
+            "material": "soil",
+            "keywords": ["excavation", "trench", "soil", "excavation"],
+        },
+    )
+
+    payload = provider.suggest_ingestion_attributes("Excavation in trench soil", unit="m3", section="Earthworks")
+
+    assert payload["category"] == "earthworks"
+    assert payload["material"] == "soil"
+    assert payload["aliases"] == ["soil excavation", "Excavate trench soil"]
+    assert payload["keywords"] == ["excavation", "trench", "soil"]
+    assert provider.suggest_aliases("Excavation in trench soil") == ["soil excavation", "Excavate trench soil"]
+
+
+def test_openai_provider_normalizes_boq_item_extraction(monkeypatch) -> None:
+    provider = OpenAIEmbeddingProvider(api_key="test-key", task_model="gpt-4.1-mini")
+    monkeypatch.setattr(
+        provider,
+        "_complete_json",
+        lambda system_prompt, user_prompt: {
+            "items": [
+                {"description": "LED light fittings complete", "unit": "nr", "reason": "Explicit fitting item.", "attributes": ["600 x 600", "LED"]},
+                {"description": "LED light fittings complete", "unit": "nr", "reason": "Duplicate wording."},
+                {"description": "Testing and commissioning", "unit": "sum", "reason": "Commissioning clause.", "attributes": ["Electrical system"]},
+            ]
+        },
+    )
+
+    items = provider.extract_boq_items("Supply and install LED light fittings complete with testing.")
+
+    assert items == [
+        {"description": "LED light fittings complete", "unit": "nr", "reason": "Explicit fitting item.", "attributes": ["600 x 600", "LED"]},
+        {"description": "Testing and commissioning", "unit": "sum", "reason": "Commissioning clause.", "attributes": ["Electrical system"]},
+    ]

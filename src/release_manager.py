@@ -123,13 +123,14 @@ def list_releases(config: Any) -> list[ReleaseRecord]:
 
 def current_production_database_path(config: Any) -> Path:
     registry = _load_registry(config)
-    current = Path(str(registry.get("current_release_path") or "")).expanduser()
-    if str(current).strip() and current.exists():
+    current_raw = str(registry.get("current_release_path") or "").strip()
+    current = Path(current_raw).expanduser() if current_raw else None
+    if current is not None and current.exists():
         return current
     fallback = fallback_production_database_path(config)
     if fallback.exists():
         return fallback
-    return current if str(current).strip() else fallback
+    return current if current is not None else fallback
 
 
 def create_release_snapshot(config: Any, operator_name: str, notes: str = "") -> ReleaseRecord:

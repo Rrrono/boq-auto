@@ -80,10 +80,19 @@ class ItemEmbedding:
 @dataclass(slots=True)
 class MatchFeedback:
     id: str
-    query: str
-    selected_item_id: str
-    rejected_item_ids: list[str]
-    created_at: str
+    query_text: str
+    item_id: str
+    action: str
+    alternative_item_id: str
+    timestamp: str
+
+    @property
+    def selected_item_id(self) -> str:
+        return self.item_id
+
+    @property
+    def created_at(self) -> str:
+        return self.timestamp
 
 
 class CostDatabase:
@@ -162,10 +171,11 @@ class CostDatabase:
                 """
                 CREATE TABLE IF NOT EXISTS match_feedback (
                     id TEXT PRIMARY KEY,
-                    query TEXT NOT NULL,
-                    selected_item_id TEXT NOT NULL,
-                    rejected_item_ids TEXT NOT NULL,
-                    created_at TEXT NOT NULL
+                    query_text TEXT NOT NULL,
+                    item_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    alternative_item_id TEXT NOT NULL DEFAULT '',
+                    timestamp TEXT NOT NULL
                 )
                 """
             )
@@ -174,6 +184,40 @@ class CostDatabase:
                 conn.execute("ALTER TABLE items ADD COLUMN material TEXT NOT NULL DEFAULT ''")
             if "keywords" not in existing_columns:
                 conn.execute("ALTER TABLE items ADD COLUMN keywords TEXT NOT NULL DEFAULT '[]'")
+            feedback_columns = {row[1] for row in conn.execute("PRAGMA table_info(match_feedback)")}
+            if "query_text" not in feedback_columns and {"query", "selected_item_id", "rejected_item_ids", "created_at"} <= feedback_columns:
+                existing_feedback = conn.execute(
+                    "SELECT id, query, selected_item_id, rejected_item_ids, created_at FROM match_feedback"
+                ).fetchall()
+                conn.execute("ALTER TABLE match_feedback RENAME TO match_feedback_legacy")
+                conn.execute(
+                    """
+                    CREATE TABLE match_feedback (
+                        id TEXT PRIMARY KEY,
+                        query_text TEXT NOT NULL,
+                        item_id TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        alternative_item_id TEXT NOT NULL DEFAULT '',
+                        timestamp TEXT NOT NULL
+                    )
+                    """
+                )
+                for row in existing_feedback:
+                    conn.execute(
+                        """
+                        INSERT INTO match_feedback (id, query_text, item_id, action, alternative_item_id, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            str(row[0]),
+                            str(row[1]),
+                            str(row[2]),
+                            "accepted",
+                            "",
+                            str(row[4]),
+                        ),
+                    )
+                conn.execute("DROP TABLE match_feedback_legacy")
         return self.path
 
     def register_source(self, name: str, version: str, file_path: str) -> CostSource:
@@ -356,19 +400,29 @@ class CostDatabase:
             for row in rows
         ]
 
-    def log_match_feedback(self, query: str, selected_item_id: str, rejected_item_ids: list[str]) -> MatchFeedback:
+    def log_match_feedback(
+        self,
+        query_text: str,
+        item_id: str,
+        action: str,
+        alternative_item_id: str = "",
+    ) -> MatchFeedback:
         self.initialize()
         record = MatchFeedback(
             id=str(uuid4()),
-            query=query,
-            selected_item_id=selected_item_id,
-            rejected_item_ids=list(rejected_item_ids),
-            created_at=utc_now_iso(),
+            query_text=query_text,
+            item_id=item_id,
+            action=action,
+            alternative_item_id=alternative_item_id,
+            timestamp=utc_now_iso(),
         )
         with sqlite3.connect(self.path) as conn:
             conn.execute(
-                "INSERT INTO match_feedback (id, query, selected_item_id, rejected_item_ids, created_at) VALUES (?, ?, ?, ?, ?)",
-                (record.id, record.query, record.selected_item_id, json.dumps(record.rejected_item_ids, ensure_ascii=True), record.created_at),
+                """
+                INSERT INTO match_feedback (id, query_text, item_id, action, alternative_item_id, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (record.id, record.query_text, record.item_id, record.action, record.alternative_item_id, record.timestamp),
             )
         return record
 
@@ -376,18 +430,20 @@ class CostDatabase:
         self.initialize()
         with sqlite3.connect(self.path) as conn:
             rows = conn.execute(
-                "SELECT id, query, selected_item_id, rejected_item_ids, created_at FROM match_feedback ORDER BY created_at DESC"
+                """
+                SELECT id, query_text, item_id, action, alternative_item_id, timestamp
+                FROM match_feedback
+                ORDER BY timestamp DESC
+                """
             ).fetchall()
-        return [
-            MatchFeedback(
-                id=str(row[0]),
-                query=str(row[1]),
-                selected_item_id=str(row[2]),
-                rejected_item_ids=list(json.loads(row[3] or "[]")),
-                created_at=str(row[4]),
-            )
-            for row in rows
-        ]
+        return [MatchFeedback(*[str(value or "") for value in row]) for row in rows]
+
+    def clear_match_feedback(self) -> int:
+        self.initialize()
+        with sqlite3.connect(self.path) as conn:
+            before = conn.execute("SELECT COUNT(*) FROM match_feedback").fetchone()
+            conn.execute("DELETE FROM match_feedback")
+        return int((before or [0])[0])
 
     def resolve_item_id(self, item_ref: str) -> str:
         self.initialize()

@@ -88,6 +88,7 @@ class DraftBOQSuggestion:
     source_reference: str
     confidence: float
     source_excerpt: str = ""
+    spec_attributes: str = ""
     review_flag: bool = True
     notes: str = ""
 
@@ -132,6 +133,7 @@ class PricingHandoffRow:
     source_origin: str
     inferred_from_tender: bool
     confidence: float
+    spec_attributes: str = ""
     review_required: bool = True
     notes: str = ""
     source_reference: str = ""

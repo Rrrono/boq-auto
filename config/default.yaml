@@ -17,6 +17,7 @@ matching:
   unit_bonus: 6
   alias_bonus: 5
   unit_penalty: 18
+  attribute_bonus: 6
   hybrid_ai_weight: 25
   hybrid_weights:
     semantic: 0.45
@@ -29,8 +30,10 @@ ai:
   provider: openai
   model: text-embedding-3-small
   embedding_model: text-embedding-3-small
+  task_model: gpt-4.1-mini
   enable_hash_fallback: true
   admin_ingestion_assist: false
+  tender_extraction_assist: false
   use_env_key: true
 processing:
   apply_rates: false

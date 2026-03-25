@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from .models import BOQLine, ColumnMap, SheetData
@@ -50,6 +50,10 @@ class WorkbookReader:
     def read(self, workbook_path: str, column_overrides: dict[str, int] | None = None) -> list[SheetData]:
         """Read a BOQ workbook into structured sheet data."""
         workbook = load_workbook(workbook_path)
+        return self.read_workbook(workbook, column_overrides)
+
+    def read_workbook(self, workbook: Workbook, column_overrides: dict[str, int] | None = None) -> list[SheetData]:
+        """Read a loaded workbook into structured sheet data."""
         sheets: list[SheetData] = []
         for worksheet in workbook.worksheets:
             classification = self.classify_sheet(worksheet)
@@ -86,6 +90,7 @@ class WorkbookReader:
             "quantity_col": self.config.get("columns.quantity_keywords", []),
             "rate_col": self.config.get("columns.rate_keywords", []),
             "amount_col": self.config.get("columns.amount_keywords", []),
+            "spec_attributes_col": ["spec attributes", "spec_attributes", "attributes", "spec details", "technical attributes"],
         }
 
         best_map = ColumnMap(header_row=1)
@@ -130,6 +135,7 @@ class WorkbookReader:
         for row_number in range(columns.header_row + 1, worksheet.max_row + 1):
             description = self._cell_text(worksheet, row_number, columns.description_col)
             unit = self._cell_text(worksheet, row_number, columns.unit_col)
+            spec_attributes = self._cell_text(worksheet, row_number, columns.spec_attributes_col)
             quantity = self._cell_float(worksheet, row_number, columns.quantity_col)
             rate = self._cell_float(worksheet, row_number, columns.rate_col)
             amount = self._cell_float(worksheet, row_number, columns.amount_col)
@@ -158,6 +164,7 @@ class WorkbookReader:
                     row_number=row_number,
                     description=description,
                     unit=unit,
+                    spec_attributes=spec_attributes,
                     quantity=quantity,
                     rate=rate,
                     amount=amount,

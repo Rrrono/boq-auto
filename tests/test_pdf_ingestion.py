@@ -10,6 +10,7 @@ def test_is_scanned_pdf_flags_sparse_text() -> None:
     assert is_scanned_pdf("")
     assert is_scanned_pdf("   \n\t  ")
     assert not is_scanned_pdf("Tender requirements and preliminaries section with enough readable text to exceed the scan threshold.")
+    assert is_scanned_pdf("\n".join(["CamScanne"] * 135))
 
 
 def test_extract_text_from_pdf_uses_ocr_fallback_when_direct_text_is_short(tmp_path, monkeypatch) -> None:

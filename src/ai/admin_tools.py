@@ -26,6 +26,9 @@ def test_ai_connection(config: Any) -> tuple[bool, str, Any]:
     return True, f"AI connection successful using {getattr(provider, 'model_name', 'unknown')}.", provider
 
 
+test_ai_connection.__test__ = False
+
+
 def generate_embeddings(schema_db: CostDatabase, provider: Any) -> int:
     """Generate or refresh embeddings for all stored items."""
 

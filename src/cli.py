@@ -54,6 +54,18 @@ def build_parser() -> argparse.ArgumentParser:
     import_rates.add_argument("--plant-type", help="Default plant type")
     import_rates.add_argument("--input-type", help="Default build-up input type")
 
+    import_priced_boq = subparsers.add_parser("import-priced-boq", help="Import priced BOQ rows into the review-first rate library")
+    import_priced_boq.add_argument("--db", required=True, help="Path to database workbook")
+    import_priced_boq.add_argument("--input", required=True, help="Path to priced BOQ Excel workbook")
+    import_priced_boq.add_argument("--region", required=True, help="Explicit region for the priced BOQ, e.g. Nyanza")
+    import_priced_boq.add_argument("--source", help="Optional source label override")
+    import_priced_boq.add_argument("--ai-assist", action="store_true", help="Use optional AI-assisted alias suggestions when available")
+    import_priced_boq.add_argument("--desc-col", type=int, help="Override description column index")
+    import_priced_boq.add_argument("--unit-col", type=int, help="Override unit column index")
+    import_priced_boq.add_argument("--qty-col", type=int, help="Override quantity column index")
+    import_priced_boq.add_argument("--rate-col", type=int, help="Override rate column index")
+    import_priced_boq.add_argument("--amount-col", type=int, help="Override amount column index")
+
     merge = subparsers.add_parser("merge-candidates", help="Merge approved CandidateMatches into live sheets")
     merge.add_argument("--db", required=True, help="Path to database workbook")
 

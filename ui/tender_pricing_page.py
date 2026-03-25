@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import pandas as pd
 import streamlit as st
@@ -12,6 +13,13 @@ from src.matching_engine import log_match_feedback
 
 from .helpers import create_work_dir, get_current_mode_label, read_binary, read_json, resolve_input_file, safe_error_message
 from .job_manager import get_active_job, run_tender_pricing
+
+
+def _parse_alternative_item_id(option_text: str) -> str:
+    raw = str(option_text or "").strip()
+    if not raw:
+        return ""
+    return re.split(r"\s*\|\s*", raw, maxsplit=1)[0].strip()
 
 
 def _render_confidence_preview(runtime, audit_json_path: Path, db_path: Path, key_suffix: str) -> None:
@@ -47,18 +55,52 @@ def _render_confidence_preview(runtime, audit_json_path: Path, db_path: Path, ke
     }
     if not feedback_options:
         return
-    with st.expander("Log Match Feedback", expanded=False):
-        selected_label = st.selectbox("Reviewed match", options=list(feedback_options.keys()), key=f"tender_feedback_row_{key_suffix}")
-        selected_row = feedback_options[selected_label]
-        rejected_text = st.text_input("Rejected item ids (comma separated)", value="", key=f"tender_feedback_rejected_{key_suffix}")
-        if st.button("Save Feedback", key=f"tender_feedback_save_{key_suffix}"):
-            log_match_feedback(
-                str(schema_database_path(db_path)),
-                selected_row.get("description", ""),
-                str(selected_row.get("matched_item_code", "")),
-                [value.strip() for value in rejected_text.split(",") if value.strip()],
-            )
-            st.success("Match feedback logged for future tuning.")
+    with st.expander("Learning Feedback", expanded=False):
+        for index, (selected_label, selected_row) in enumerate(feedback_options.items()):
+            with st.container(border=True):
+                st.write(
+                    {
+                        "query": selected_row.get("description", ""),
+                        "current_match": selected_row.get("matched_item_code", ""),
+                        "matched_description": selected_row.get("matched_description", ""),
+                        "confidence_score": selected_row.get("confidence_score", 0),
+                    }
+                )
+                alternative_options = [option for option in selected_row.get("alternate_options", []) if str(option).strip()]
+                alternative_choice = st.selectbox(
+                    "Select alternative match",
+                    options=[""] + alternative_options,
+                    key=f"tender_feedback_alt_{key_suffix}_{index}",
+                    help="Choose one of the top alternate matches when the current match is wrong.",
+                )
+                action_cols = st.columns(3)
+                schema_path = schema_database_path(db_path)
+                if action_cols[0].button("Accept Match", key=f"tender_feedback_accept_{key_suffix}_{index}"):
+                    log_match_feedback(
+                        str(schema_path),
+                        selected_row.get("description", ""),
+                        str(selected_row.get("matched_item_code", "")),
+                        "accepted",
+                    )
+                    st.success("Accepted match saved to the learning loop.")
+                if action_cols[1].button("Reject Match", key=f"tender_feedback_reject_{key_suffix}_{index}"):
+                    log_match_feedback(
+                        str(schema_path),
+                        selected_row.get("description", ""),
+                        str(selected_row.get("matched_item_code", "")),
+                        "rejected",
+                    )
+                    st.success("Rejected match saved to the learning loop.")
+                if action_cols[2].button("Apply Alternative", key=f"tender_feedback_correct_{key_suffix}_{index}", disabled=not alternative_choice):
+                    alternative_item_id = _parse_alternative_item_id(alternative_choice)
+                    log_match_feedback(
+                        str(schema_path),
+                        selected_row.get("description", ""),
+                        str(selected_row.get("matched_item_code", "")),
+                        "corrected",
+                        alternative_item_id=alternative_item_id,
+                    )
+                    st.success(f"Alternative match {alternative_item_id or alternative_choice} saved to the learning loop.")
 
 
 def render(runtime) -> None:

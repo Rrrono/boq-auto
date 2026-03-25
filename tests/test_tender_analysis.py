@@ -146,3 +146,109 @@ def test_boq_drafter_leaves_unit_blank_when_inference_is_weak() -> None:
 
     assert suggestions
     assert suggestions[0].unit == ""
+
+
+def test_boq_drafter_can_add_optional_ai_spec_candidates(monkeypatch) -> None:
+    config = load_config()
+    config.data.setdefault("ai", {})
+    config.data["ai"]["enabled"] = True
+    config.data["ai"]["tender_extraction_assist"] = True
+
+    class FixedProvider:
+        def extract_boq_items(self, text: str, *, section: str = "", region: str = "") -> list[dict]:
+            return [
+                {
+                    "description": "LED light fittings complete with drivers and accessories",
+                    "unit": "nr",
+                    "reason": "Lighting fitting requirement is explicitly described in the clause.",
+                    "attributes": ["600 x 600", "LED", "Complete with drivers", "Ceiling mounted"],
+                }
+            ]
+
+    monkeypatch.setattr("src.boq_drafter.get_embedding_provider", lambda config: FixedProvider())
+
+    document = TenderDocument(
+        source_path=Path("tender/test.txt"),
+        document_name="test.txt",
+        document_type="text",
+        title="Test Tender",
+        text="",
+        lines=[
+            TenderSourceLine(
+                source_reference="L1",
+                text="Supply and install 600 x 600 LED light fittings complete with drivers and accessories.",
+                line_number=1,
+            )
+        ],
+    )
+    sections = [ScopeSection(section_name="Electrical", confidence=80.0, source_references=["L1"], matched_keywords=["electrical", "lighting"])]
+
+    suggestions = BOQDrafter(config).build_suggestions(document, sections)
+
+    descriptions = {item.description for item in suggestions}
+    assert "LED light fittings complete with drivers and accessories" in descriptions
+    target = next(item for item in suggestions if item.description == "LED light fittings complete with drivers and accessories")
+    assert target.unit == "nr"
+    assert "600 x 600" in target.spec_attributes
+    assert "Ceiling mounted" in target.spec_attributes
+
+
+def test_boq_drafter_chunks_long_spec_text_for_ai_extraction(monkeypatch) -> None:
+    config = load_config()
+    config.data.setdefault("ai", {})
+    config.data["ai"]["enabled"] = True
+    config.data["ai"]["tender_extraction_assist"] = True
+
+    calls: list[str] = []
+
+    class FixedProvider:
+        def extract_boq_items(self, text: str, *, section: str = "", region: str = "") -> list[dict]:
+            calls.append(text)
+            if "light fittings" in text.lower():
+                return [
+                    {
+                        "description": "LED light fittings complete with drivers and accessories",
+                        "unit": "nr",
+                        "reason": "Lighting fitting requirement is explicitly described in the clause.",
+                        "attributes": ["600 x 600", "LED", "Ceiling mounted"],
+                    }
+                ]
+            if "switches and socket outlets" in text.lower():
+                return [
+                    {
+                        "description": "Switches and socket outlets complete",
+                        "unit": "nr",
+                        "reason": "Accessory requirement is explicitly described in the clause.",
+                        "attributes": ["Metal clad", "Including faceplates"],
+                    }
+                ]
+            return []
+
+    monkeypatch.setattr("src.boq_drafter.get_embedding_provider", lambda config: FixedProvider())
+
+    document = TenderDocument(
+        source_path=Path("tender/test.txt"),
+        document_name="test.txt",
+        document_type="text",
+        title="Test Tender",
+        text="",
+        lines=[
+            TenderSourceLine(
+                source_reference="L1",
+                text=(
+                    "Supply and install 600 x 600 LED light fittings complete with drivers and accessories, "
+                    "including all wiring connections and supports; provide switches and socket outlets complete "
+                    "with faceplates and accessories for the lighting and small power installation."
+                ),
+                line_number=1,
+            )
+        ],
+    )
+    sections = [ScopeSection(section_name="Electrical", confidence=82.0, source_references=["L1"], matched_keywords=["electrical", "lighting", "socket"])]
+
+    suggestions = BOQDrafter(config).build_suggestions(document, sections)
+
+    descriptions = {item.description for item in suggestions}
+    assert "LED light fittings complete with drivers and accessories" in descriptions
+    assert "Switches and socket outlets complete" in descriptions
+    assert len(calls) >= 2

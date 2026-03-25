@@ -12,13 +12,14 @@ from typing import Any
 from openpyxl import load_workbook
 
 from src.cost_schema import CostDatabase, build_cost_item, schema_database_path
-from src.ingestion import ImportSummary, import_structured_rows
+from src.ingestion import ALIASES_HEADERS, ImportSummary, append_row, ensure_sheet_headers, import_structured_rows
 from src.normalizer import normalize_text, normalize_unit
 from src.pdf_ingestion import extract_text_from_pdf
 from src.utils import safe_float
 
 
-UNIT_PATTERN = r"(m2|m3|m|nr|sum|item|kg|km|day|hr|ton)"
+UNIT_PATTERN = r"(m2|m3|m|nr|sum|item|kg|km|day|hr|ton|sm|cm|no|nos)"
+RATE_TOKEN_PATTERN = re.compile(r"(?P<value>\d[\d,]*(?:\.\d+)?)")
 MATERIAL_KEYWORDS = {
     "concrete": ["concrete", "blinding", "screed"],
     "steel": ["reinforcement", "rebar", "steel"],
@@ -49,35 +50,109 @@ def parse_manual_text(text: str) -> list[ManualItem]:
     """Extract likely manual rows from PDF text."""
 
     items: list[ManualItem] = []
+    pending_line = ""
     for raw_line in text.splitlines():
         line = " ".join(str(raw_line).split())
         if not line:
             continue
-        match = re.match(
-            rf"^(?P<code>\d+(?:\.\d+){{0,4}})\s+(?P<description>.+?)\s+(?P<unit>{UNIT_PATTERN})(?:\s+(?P<rate>[\d,]+(?:\.\d+)?))?$",
-            line,
-            flags=re.IGNORECASE,
-        )
+        match = _match_manual_item_line(line)
+        if not match and pending_line:
+            match = _match_manual_item_line(f"{pending_line} {line}")
+            if match:
+                line = f"{pending_line} {line}"
+                pending_line = ""
         if match:
-            description = str(match.group("description") or "").strip()
+            description = _clean_description(str(match.group("description") or "").strip())
+            rates_text = str(match.group("rates") or "")
+            rate = _extract_rate(rates_text)
+            code = str(match.group("code") or "").strip()
+            if not description or (not code and rate is None) or (not code and not _looks_like_rate_block(rates_text)) or not _is_plausible_manual_item(description, code):
+                pending_line = line
+                continue
             items.append(
                 ManualItem(
-                    code=str(match.group("code") or "").strip(),
+                    code=code,
                     item_name=description,
                     unit=normalize_unit(str(match.group("unit") or "")),
                     description=description,
-                    rate=safe_float(str(match.group("rate") or "").replace(",", "")) or 0.0,
+                    rate=rate or 0.0,
                     category=_infer_category(description),
                     material=_infer_material(description),
                     keywords=_extract_keywords(description),
                 )
             )
             continue
-        if items and line[:1].islower():
+        if items and _looks_like_continuation(line):
             previous = items[-1]
             previous.description = f"{previous.description} {line}".strip()
             previous.item_name = previous.description
+            pending_line = ""
+            continue
+        if _looks_like_item_prefix(line):
+            pending_line = line
+        else:
+            pending_line = ""
     return items
+
+
+def _match_manual_item_line(line: str):
+    return re.match(
+        rf"^(?:(?P<code>\d+(?:\.\d+){{0,4}})\s+)?(?P<description>.+?)\s+(?P<unit>{UNIT_PATTERN})\b(?:\s+(?P<rates>.+))?$",
+        line,
+        flags=re.IGNORECASE,
+    )
+
+
+def _extract_rate(rates_text: str) -> float | None:
+    for match in RATE_TOKEN_PATTERN.finditer(str(rates_text or "")):
+        value = safe_float(match.group("value").replace(",", ""))
+        if value is not None:
+            return value
+    return None
+
+
+def _clean_description(description: str) -> str:
+    cleaned = re.sub(r"^[^\w]+", "", description or "").strip()
+    return cleaned.rstrip(" .,:;")
+
+
+def _looks_like_continuation(line: str) -> bool:
+    stripped = str(line or "").strip()
+    if not stripped:
+        return False
+    if stripped[:1].islower():
+        return True
+    return bool(re.match(r"^[\(\[\-.,;:/]", stripped))
+
+
+def _looks_like_item_prefix(line: str) -> bool:
+    stripped = str(line or "").strip()
+    if not stripped:
+        return False
+    if re.match(r"^\d+(?:\.\d+){0,4}\s+", stripped):
+        return True
+    words = stripped.split()
+    return len(words) >= 3 and any(char.isdigit() for char in stripped)
+
+
+def _is_plausible_manual_item(description: str, code: str) -> bool:
+    if code:
+        return True
+    normalized = " ".join(str(description or "").split())
+    if len(normalized) > 180:
+        return False
+    if normalized.count(".") > 2:
+        return False
+    return len(normalized.split()) <= 24
+
+
+def _looks_like_rate_block(rates_text: str) -> bool:
+    text = str(rates_text or "").strip()
+    if not text:
+        return False
+    numeric_tokens = RATE_TOKEN_PATTERN.findall(text)
+    alpha_chars = sum(1 for char in text if char.isalpha())
+    return len(numeric_tokens) >= 1 and alpha_chars <= 12
 
 
 def load_manual_excel(path: str, sheet_name: str | None = None) -> list[dict[str, Any]]:
@@ -152,7 +227,7 @@ def ingest_manual_to_database(
 
     schema_db = CostDatabase(schema_database_path(db_path))
     source = schema_db.register_source(source_name, source_version, source_file or source_name)
-    prepared_items = [enhance_manual_item(item, enable_ai=ai_enhance) for item in items]
+    prepared_items = [enhance_manual_item(item, enable_ai=ai_enhance, provider=embedding_provider) for item in items]
     cost_items = [
         build_cost_item(
             code=item.code,
@@ -218,6 +293,9 @@ def ingest_manual_to_database(
                 "active": True,
             },
         )
+        alias_count = _sync_aliases_to_excel(db_path, prepared_items)
+        if alias_count:
+            summary.notes.append(f"Added {alias_count} alias row(s) to Aliases.")
         schema_db.log_ingestion(source.id, "completed", f"Excel append summary: appended={summary.appended} candidates={summary.candidates_created}")
         if embedding_provider is not None:
             for index, cost_item in enumerate(cost_items):
@@ -247,7 +325,29 @@ def enhance_manual_item(item: ManualItem, enable_ai: bool = False, provider=None
         updated.aliases = _rule_aliases(updated)
     if enable_ai:
         updated.category = updated.category or _suggest_category(updated.description)
-        if provider is not None and hasattr(provider, "suggest_aliases"):
+        if provider is not None and hasattr(provider, "suggest_ingestion_attributes"):
+            try:
+                suggestion = provider.suggest_ingestion_attributes(
+                    updated.description,
+                    unit=updated.unit,
+                    section=updated.category,
+                )
+            except Exception:
+                suggestion = {}
+            if isinstance(suggestion, dict):
+                suggested_category = str(suggestion.get("category", "") or "").strip()
+                suggested_material = str(suggestion.get("material", "") or "").strip()
+                suggested_keywords = [str(value).strip() for value in suggestion.get("keywords", []) if str(value).strip()]
+                suggested_aliases = [str(value).strip() for value in suggestion.get("aliases", []) if str(value).strip()]
+                if suggested_category:
+                    updated.category = suggested_category
+                if suggested_material and not updated.material:
+                    updated.material = suggested_material
+                if suggested_keywords:
+                    updated.keywords = list(dict.fromkeys([*updated.keywords, *suggested_keywords]))
+                if suggested_aliases:
+                    updated.aliases.extend([alias for alias in suggested_aliases if alias and alias not in updated.aliases])
+        elif provider is not None and hasattr(provider, "suggest_aliases"):
             try:
                 suggested = provider.suggest_aliases(updated.description)
                 updated.aliases.extend([alias for alias in suggested if alias and alias not in updated.aliases])
@@ -313,3 +413,42 @@ def _ai_style_aliases(item: ManualItem) -> list[str]:
 
 def _embedding_text_from_manual_item(item: ManualItem) -> str:
     return " | ".join([item.category.strip(), item.material.strip(), item.description.strip(), item.unit.strip()])
+
+
+def _sync_aliases_to_excel(db_path: Path, items: list[ManualItem]) -> int:
+    workbook = load_workbook(db_path)
+    alias_sheet = ensure_sheet_headers(workbook, "Aliases", ALIASES_HEADERS)
+    existing = {
+        (
+            str(values[0] or "").strip().lower(),
+            str(values[1] or "").strip().lower(),
+        )
+        for values in alias_sheet.iter_rows(min_row=2, values_only=True)
+    }
+    added = 0
+    for item in items:
+        canonical_term = (item.description or item.item_name or "").strip()
+        if not canonical_term:
+            continue
+        for alias in item.aliases:
+            alias_text = str(alias or "").strip()
+            if not alias_text:
+                continue
+            key = (alias_text.lower(), canonical_term.lower())
+            if key in existing:
+                continue
+            append_row(
+                alias_sheet,
+                ALIASES_HEADERS,
+                {
+                    "alias": alias_text,
+                    "canonical_term": canonical_term,
+                    "section_bias": item.category,
+                    "notes": "Manual ingestion review",
+                },
+            )
+            existing.add(key)
+            added += 1
+    if added:
+        workbook.save(db_path)
+    return added

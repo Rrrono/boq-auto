@@ -49,3 +49,19 @@ def test_workbook_reader_handles_dayworks_sheet_and_merged_header(tmp_path) -> N
     sheets = reader.read(str(path))
     assert sheets[0].columns.description_col == 1
     assert sheets[0].rows[0].description == "15 tonne tipper lorry"
+
+
+def test_workbook_reader_preserves_spec_attributes_column(tmp_path) -> None:
+    workbook = Workbook()
+    ws = workbook.active
+    ws.title = "Pricing Handoff"
+    ws.append(["Description", "Unit", "Qty", "Spec Attributes"])
+    ws.append(["LED light fittings complete", "nr", 20, "600 x 600; LED; Ceiling mounted"])
+    path = tmp_path / "handoff.xlsx"
+    workbook.save(path)
+
+    reader = WorkbookReader(load_config())
+    sheets = reader.read(str(path))
+
+    assert sheets[0].columns.spec_attributes_col == 4
+    assert sheets[0].rows[0].spec_attributes == "600 x 600; LED; Ceiling mounted"

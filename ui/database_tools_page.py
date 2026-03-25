@@ -11,9 +11,11 @@ from src.ingestion import (
     build_rate_library_row,
     deduplicate_database,
     generate_review_report,
+    import_priced_boq,
     import_structured_rows,
     merge_reviewed_candidates,
     normalize_database_units,
+    preview_priced_boq_import,
     promote_approved_candidates,
 )
 
@@ -46,6 +48,7 @@ def render(runtime) -> None:
             "Merge reviewed candidates",
             "Promote approved candidates",
             "Import structured rows",
+            "Import priced BOQ",
         ],
     )
     dedupe_sheet = st.text_input("Deduplicate sheet", value="RateLibrary", disabled=action != "Deduplicate database")
@@ -58,6 +61,17 @@ def render(runtime) -> None:
     import_section = st.text_input("Default section", value="", disabled=action != "Import structured rows" or import_target != "RateLibrary")
     import_region = st.text_input("Default region", value=runtime.config.default_region, disabled=action != "Import structured rows")
     import_source = st.text_input("Default source label", value="Admin Import", disabled=action != "Import structured rows")
+    priced_boq_uploaded = st.file_uploader("Priced BOQ file", type=["xlsx", "xlsm", "pdf"], key="db_tools_priced_boq_upload", disabled=action != "Import priced BOQ")
+    priced_boq_existing_path = st.text_input("Or use existing priced BOQ path", value="", key="db_tools_priced_boq_path", disabled=action != "Import priced BOQ")
+    priced_boq_region = st.text_input("Priced BOQ region", value=runtime.config.default_region, key="db_tools_priced_boq_region", disabled=action != "Import priced BOQ")
+    priced_boq_source = st.text_input("Priced BOQ source label", value="Priced BOQ Import", key="db_tools_priced_boq_source", disabled=action != "Import priced BOQ")
+    priced_boq_ai_assist = st.checkbox(
+        "Use AI-assisted BOQ alias suggestions when available",
+        value=bool(runtime.config.get("ai.admin_ingestion_assist", False)),
+        key="db_tools_priced_boq_ai_assist",
+        disabled=action != "Import priced BOQ",
+    )
+    preview_key = "db_tools_priced_boq_preview"
 
     mutating_actions = {
         "Normalize units",
@@ -66,13 +80,62 @@ def render(runtime) -> None:
         "Merge reviewed candidates",
         "Promote approved candidates",
         "Import structured rows",
+        "Import priced BOQ",
     }
+    if action != "Import priced BOQ":
+        st.session_state.pop(preview_key, None)
     confirm_mutation = st.checkbox(
         "I understand mutating actions can update the selected training database",
         value=False,
         key="db_tools_confirm_mutation",
         disabled=action not in mutating_actions,
     )
+
+    if action == "Import priced BOQ" and st.button("Preview priced BOQ extraction"):
+        try:
+            work_dir = create_work_dir(runtime.config)
+            priced_boq_path = resolve_input_file(priced_boq_uploaded, priced_boq_existing_path, work_dir)
+            preview = preview_priced_boq_import(
+                db_path=str(db_path),
+                boq_path=str(priced_boq_path),
+                region=priced_boq_region.strip(),
+                source_label=priced_boq_source.strip() or None,
+                config=runtime.config,
+                ai_assist=priced_boq_ai_assist,
+            )
+            st.session_state[preview_key] = preview
+        except Exception as exc:
+            st.session_state.pop(preview_key, None)
+            st.error(safe_error_message(exc))
+
+    preview = st.session_state.get(preview_key) if action == "Import priced BOQ" else None
+    if preview is not None:
+        st.info(
+            f"Preview found {preview.total_extracted} priced BOQ row(s) for {preview.region}. "
+            f"Skipped {preview.skipped_missing_rate} without rate and {preview.skipped_missing_unit} without unit."
+        )
+        if preview.append_count or preview.candidate_count or preview.duplicate_count:
+            decision_cols = st.columns(3)
+            decision_cols[0].metric("Would append", preview.append_count)
+            decision_cols[1].metric("Would create candidates", preview.candidate_count)
+            decision_cols[2].metric("Would skip as duplicates", preview.duplicate_count)
+        if preview.notes:
+            st.write(preview.notes)
+        if preview.extracted_rows:
+            st.caption("Sample extracted priced BOQ rows")
+            st.dataframe(preview.extracted_rows[:50], use_container_width=True)
+        if preview.append_preview:
+            st.caption("Rows expected to append cleanly")
+            st.dataframe(preview.append_preview[:50], use_container_width=True)
+        if preview.candidate_preview:
+            st.caption("Rows expected to route to CandidateMatches")
+            st.dataframe(preview.candidate_preview[:50], use_container_width=True)
+        if preview.duplicate_preview:
+            st.caption("Rows expected to be skipped as same-rate duplicates")
+            st.dataframe(preview.duplicate_preview[:50], use_container_width=True)
+        if preview.alias_preview:
+            st.caption("Style-learning preview")
+            st.dataframe(preview.alias_preview[:50], use_container_width=True)
 
     if st.button("Run Database Tool", type="primary"):
         try:
@@ -159,6 +222,27 @@ def render(runtime) -> None:
                         file_name=json_path.name,
                         mime="application/json",
                     )
+            elif action == "Import priced BOQ":
+                priced_boq_path = resolve_input_file(priced_boq_uploaded, priced_boq_existing_path, work_dir)
+                summary = import_priced_boq(
+                    db_path=str(db_path),
+                    boq_path=str(priced_boq_path),
+                    region=priced_boq_region.strip(),
+                    source_label=priced_boq_source.strip() or None,
+                    config=runtime.config,
+                    ai_assist=priced_boq_ai_assist,
+                )
+                st.success(
+                    f"Imported {summary.appended} priced BOQ row(s), created {summary.candidates_created} candidate review row(s), and skipped {summary.skipped_duplicates} duplicate row(s)."
+                )
+                if summary.notes:
+                    st.write(summary.notes)
+                st.download_button(
+                    "Download updated database",
+                    data=read_binary(db_path),
+                    file_name=db_path.name,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
             else:
                 import_path = resolve_input_file(import_uploaded, import_existing_path, work_dir)
                 mapper = build_rate_library_row if import_target == "RateLibrary" else build_buildup_input_row

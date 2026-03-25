@@ -10,7 +10,9 @@ STOP_WORDS = {"complete", "including", "with", "and", "of", "the", "type"}
 UNIT_SYNONYMS = {
     "m3": "m3",
     "m^3": "m3",
+    "cm": "m3",
     "m2": "m2",
+    "sm": "m2",
     "sqm": "m2",
     "sqm.": "m2",
     "sq.m": "m2",

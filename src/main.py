@@ -14,6 +14,7 @@ from .ingestion import (
     build_rate_library_row,
     deduplicate_database,
     generate_review_report,
+    import_priced_boq,
     import_structured_rows,
     merge_candidate_matches,
     merge_reviewed_candidates,
@@ -103,6 +104,32 @@ def _handle_import(logger, args: Namespace) -> int:
         summary.appended,
         summary.skipped_duplicates,
         summary.candidates_created,
+    )
+    return 0
+
+
+def _handle_import_priced_boq(logger, args: Namespace) -> int:
+    summary = import_priced_boq(
+        db_path=args.db,
+        boq_path=args.input,
+        region=args.region,
+        source_label=args.source,
+        ai_assist=args.ai_assist,
+        column_overrides={
+            "description_col": args.desc_col,
+            "unit_col": args.unit_col,
+            "quantity_col": args.qty_col,
+            "rate_col": args.rate_col,
+            "amount_col": args.amount_col,
+        },
+    )
+    logger.info(
+        "Imported priced BOQ rows: extracted=%s appended=%s candidates=%s duplicates=%s notes=%s",
+        summary.total_rows,
+        summary.appended,
+        summary.candidates_created,
+        summary.skipped_duplicates,
+        "; ".join(summary.notes),
     )
     return 0
 
@@ -203,6 +230,8 @@ def main() -> int:
         return 0
     if args.command == "import-rates":
         return _handle_import(logger, args)
+    if args.command == "import-priced-boq":
+        return _handle_import_priced_boq(logger, args)
     if args.command == "merge-candidates":
         summary = merge_candidate_matches(args.db)
         logger.info("Merged %s approved candidate row(s).", summary.merged)

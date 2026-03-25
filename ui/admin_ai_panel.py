@@ -66,9 +66,19 @@ def render(runtime) -> None:
             key="admin_ai_matching_mode",
         )
         model_name = st.text_input(
-            "Model name",
+            "Embedding model",
             value=str(config.get("ai.model", config.get("ai.embedding_model", "text-embedding-3-small"))),
             key="admin_ai_model_name",
+        )
+        task_model_name = st.text_input(
+            "Task model",
+            value=str(config.get("ai.task_model", "gpt-4.1-mini")),
+            key="admin_ai_task_model_name",
+        )
+        tender_extraction_assist = st.checkbox(
+            "Enable AI-assisted tender/spec BOQ extraction",
+            value=bool(config.get("ai.tender_extraction_assist", False)),
+            key="admin_ai_tender_extraction_assist",
         )
         st.caption("API keys are never stored here. Set OPENAI_API_KEY in the environment on the admin machine.")
         if enabled and not os.getenv("OPENAI_API_KEY", "").strip():
@@ -82,6 +92,8 @@ def render(runtime) -> None:
                             "provider": "openai",
                             "model": model_name.strip() or "text-embedding-3-small",
                             "embedding_model": model_name.strip() or "text-embedding-3-small",
+                            "task_model": task_model_name.strip() or "gpt-4.1-mini",
+                            "tender_extraction_assist": bool(tender_extraction_assist),
                             "use_env_key": True,
                         },
                         "matching": {

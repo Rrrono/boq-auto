@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from openpyxl import Workbook, load_workbook
 
+from .pdf_ingestion import extract_text_from_pdf
 from .normalizer import normalize_text, normalize_unit
+from .section_inference import classify_sheet_name
+from .workbook_reader import WorkbookReader
+from .config import load_config
 from .utils import safe_float, truthy
 
 RATE_LIBRARY_HEADERS = [
@@ -83,6 +90,8 @@ REGION_ALIASES = {
     "kisumu": "Nyanza",
     "western kenya": "Western",
 }
+PDF_UNIT_TOKENS = {"m2", "m3", "m", "nr", "sum", "item", "kg", "km", "day", "hr", "ton", "sm", "cm", "no", "nos"}
+PRICE_TOKEN_RE = re.compile(r"^\d[\d,]*(?:\.\d+)?$")
 
 
 @dataclass(slots=True)
@@ -100,6 +109,25 @@ class ImportSummary:
     promoted: int = 0
     report_rows: int = 0
     training_records: int = 0
+    notes: list[str] = field(default_factory=list)
+    appended_records: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class BoqImportPreview:
+    source_file: str
+    region: str
+    total_extracted: int = 0
+    skipped_missing_rate: int = 0
+    skipped_missing_unit: int = 0
+    append_count: int = 0
+    candidate_count: int = 0
+    duplicate_count: int = 0
+    extracted_rows: list[dict[str, Any]] = field(default_factory=list)
+    append_preview: list[dict[str, Any]] = field(default_factory=list)
+    candidate_preview: list[dict[str, Any]] = field(default_factory=list)
+    duplicate_preview: list[dict[str, Any]] = field(default_factory=list)
+    alias_preview: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
 
@@ -230,13 +258,13 @@ def build_buildup_input_row(
     }
 
 
-def existing_rate_indexes(sheet) -> tuple[dict[str, int], dict[tuple[str, str], int]]:
+def existing_rate_indexes(sheet) -> tuple[dict[str, int], dict[tuple[str, str, str], int]]:
     """Build duplicate-detection indexes for RateLibrary or BuildUpInputs sheets."""
     headers = workbook_headers(sheet)
     code_field = "item_code" if "item_code" in headers else "input_code"
     description_field = "normalized_description" if "normalized_description" in headers else "description"
     code_index: dict[str, int] = {}
-    desc_unit_index: dict[tuple[str, str], int] = {}
+    desc_unit_region_index: dict[tuple[str, str, str], int] = {}
     header_pos = {header: idx for idx, header in enumerate(headers)}
     for row_number, values in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
         item_code = str(values[header_pos[code_field]] or "").strip()
@@ -244,11 +272,12 @@ def existing_rate_indexes(sheet) -> tuple[dict[str, int], dict[tuple[str, str], 
         if description_field == "description":
             description = normalize_text(description)
         unit = normalize_unit(str(values[header_pos["unit"]] or ""))
+        region = normalize_region_name(str(values[header_pos["region"]] or "")) if "region" in header_pos else ""
         if item_code:
             code_index[item_code] = row_number
         if description and unit:
-            desc_unit_index[(description, unit)] = row_number
-    return code_index, desc_unit_index
+            desc_unit_region_index[(description, unit, region)] = row_number
+    return code_index, desc_unit_region_index
 
 
 def write_candidate_match(
@@ -301,7 +330,7 @@ def import_structured_rows(
     set_candidate_defaults(candidate_sheet)
     ensure_sheet_headers(workbook, "ReviewLog", REVIEW_LOG_HEADERS)
     rows = read_structured_table(input_path, source_sheet)
-    code_index, desc_unit_index = existing_rate_indexes(target)
+    code_index, desc_unit_region_index = existing_rate_indexes(target)
 
     batch_id = f"import-{timestamp_now().replace(':', '').replace('-', '')}"
     summary = ImportSummary(target_sheet=target_sheet, source_file=input_path, total_rows=len(rows))
@@ -318,18 +347,19 @@ def import_structured_rows(
         item_code = str(mapped.get(item_code_key, "")).strip()
         normalized_description = str(mapped.get("normalized_description") or normalize_text(mapped.get("description", ""))).strip()
         unit = normalize_unit(str(mapped.get("unit", "")))
+        region = normalize_region_name(str(mapped.get("region", "")))
         duplicate_reason = ""
         matched_item_code = ""
 
         if item_code and item_code in code_index:
             duplicate_reason = f"duplicate {item_code_key}"
             matched_item_code = item_code
-        elif normalized_description and unit and (normalized_description, unit) in desc_unit_index:
-            duplicate_reason = "duplicate normalized description + unit"
-            matched_item_code = str(mapped.get(item_code_key, "")) or str(desc_unit_index[(normalized_description, unit)])
+        elif normalized_description and unit and (normalized_description, unit, region) in desc_unit_region_index:
+            duplicate_reason = "duplicate normalized description + unit + region"
+            matched_item_code = str(mapped.get(item_code_key, "")) or str(desc_unit_region_index[(normalized_description, unit, region)])
 
         if duplicate_reason:
-            existing_row_number = code_index.get(item_code) or desc_unit_index.get((normalized_description, unit))
+            existing_row_number = code_index.get(item_code) or desc_unit_region_index.get((normalized_description, unit, region))
             existing_rate = safe_float(target.cell(existing_row_number, workbook_headers(target).index("rate") + 1).value) if existing_row_number else None
             incoming_rate = safe_float(mapped.get("rate"))
             materially_different = existing_rate is None or incoming_rate is None or abs(existing_rate - incoming_rate) > 0.001
@@ -389,10 +419,590 @@ def import_structured_rows(
         append_row(target, target_headers, mapped)
         if item_code:
             code_index[item_code] = target.max_row
-        desc_unit_index[(normalized_description, unit)] = target.max_row
+        desc_unit_region_index[(normalized_description, unit, region)] = target.max_row
         summary.appended += 1
+        summary.appended_records.append(dict(mapped))
 
     workbook.save(db_path)
+    return summary
+
+
+def _classify_structured_import_rows(
+    db_path: str,
+    target_sheet: str,
+    mapped_rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    workbook = load_workbook(db_path, data_only=True)
+    target_headers = RATE_LIBRARY_HEADERS if target_sheet == "RateLibrary" else BUILDUP_INPUT_HEADERS
+    target = ensure_sheet_headers(workbook, target_sheet, target_headers)
+    code_index, desc_unit_region_index = existing_rate_indexes(target)
+    target_header_positions = {header: index + 1 for index, header in enumerate(workbook_headers(target))}
+
+    append_rows: list[dict[str, Any]] = []
+    candidate_rows: list[dict[str, Any]] = []
+    duplicate_rows: list[dict[str, Any]] = []
+
+    for mapped in mapped_rows:
+        item_code_key = "item_code" if target_sheet == "RateLibrary" else "input_code"
+        item_code = str(mapped.get(item_code_key, "")).strip()
+        normalized_description = str(mapped.get("normalized_description") or normalize_text(mapped.get("description", ""))).strip()
+        unit = normalize_unit(str(mapped.get("unit", "")))
+        region = normalize_region_name(str(mapped.get("region", "")))
+        duplicate_reason = ""
+        matched_item_code = ""
+
+        if item_code and item_code in code_index:
+            duplicate_reason = f"duplicate {item_code_key}"
+            matched_item_code = item_code
+        elif normalized_description and unit and (normalized_description, unit, region) in desc_unit_region_index:
+            duplicate_reason = "duplicate normalized description + unit + region"
+            matched_item_code = str(mapped.get(item_code_key, "")) or str(desc_unit_region_index[(normalized_description, unit, region)])
+
+        if not duplicate_reason:
+            append_rows.append(
+                {
+                    "decision": "append",
+                    "item_code": item_code,
+                    "description": mapped.get("description", ""),
+                    "section": mapped.get("section", ""),
+                    "unit": unit,
+                    "rate": mapped.get("rate", ""),
+                    "region": region,
+                    "source_sheet": mapped.get("source_sheet", ""),
+                    "source_page": mapped.get("source_page", ""),
+                }
+            )
+            if item_code:
+                code_index[item_code] = -1
+            if normalized_description and unit:
+                desc_unit_region_index[(normalized_description, unit, region)] = -1
+            continue
+
+        existing_row_number = code_index.get(item_code) or desc_unit_region_index.get((normalized_description, unit, region))
+        existing_rate = safe_float(target.cell(existing_row_number, target_header_positions["rate"]).value) if existing_row_number and existing_row_number > 0 else None
+        incoming_rate = safe_float(mapped.get("rate"))
+        materially_different = existing_rate is None or incoming_rate is None or abs(existing_rate - incoming_rate) > 0.001
+        preview_row = {
+            "decision": "candidate" if materially_different else "duplicate",
+            "item_code": item_code,
+            "description": mapped.get("description", ""),
+            "section": mapped.get("section", ""),
+            "unit": unit,
+            "incoming_rate": incoming_rate,
+            "existing_rate": existing_rate,
+            "region": region,
+            "duplicate_reason": duplicate_reason,
+            "matched_item_code": matched_item_code,
+            "source_sheet": mapped.get("source_sheet", ""),
+            "source_page": mapped.get("source_page", ""),
+        }
+        if materially_different:
+            candidate_rows.append(preview_row)
+        else:
+            duplicate_rows.append(preview_row)
+
+    return append_rows, candidate_rows, duplicate_rows
+
+
+def _boq_import_code(region: str, section: str, description: str, unit: str) -> str:
+    region_code = normalize_text(region).replace(" ", "")[:3].upper() or "GEN"
+    digest = hashlib.sha1(f"{normalize_text(section)}|{normalize_text(description)}|{normalize_unit(unit)}|{normalize_text(region)}".encode("utf-8")).hexdigest()[:8].upper()
+    return f"BOQ-{region_code}-{digest}"
+
+
+def _boq_keywords(description: str) -> str:
+    tokens = [token for token in normalize_text(description).split() if len(token) > 3]
+    return ", ".join(dict.fromkeys(tokens[:8]))
+
+
+def _style_aliases(description: str, section: str = "") -> list[str]:
+    raw = " ".join(str(description or "").split()).strip(" -.,;:")
+    if not raw:
+        return []
+    aliases: list[str] = []
+    if ";" in raw:
+        aliases.append(raw.split(";", 1)[0].strip(" -.,;:"))
+    without_parens = re.sub(r"\([^)]*\)", "", raw).strip(" -.,;:")
+    if without_parens and without_parens != raw:
+        aliases.append(without_parens)
+    without_dimensions = re.sub(r"\b\d+(?:\.\d+)?(?:mm|cm|m|kg|nr|m2|m3)?\b", "", without_parens, flags=re.IGNORECASE)
+    without_dimensions = re.sub(r"\b(?:x|dia|depth|thick|thickness|not exceeding)\b", "", without_dimensions, flags=re.IGNORECASE)
+    without_dimensions = " ".join(without_dimensions.split()).strip(" -.,;:")
+    if without_dimensions and without_dimensions != raw:
+        aliases.append(without_dimensions)
+    normalized_section = normalize_text(section)
+    normalized_raw = normalize_text(raw)
+    if normalized_section and normalized_section in normalized_raw:
+        removed_section = re.sub(rf"\b{re.escape(normalized_section)}\b", "", normalized_raw).strip()
+        if removed_section and removed_section != normalized_raw:
+            aliases.append(removed_section.title())
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    canonical = normalize_text(raw)
+    for alias in aliases:
+        normalized = normalize_text(alias)
+        if not normalized or normalized == canonical or len(normalized.split()) < 2:
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        cleaned.append(" ".join(alias.split()))
+    return cleaned[:5]
+
+
+def _sync_aliases_to_excel(db_path: str, aliases_by_description: dict[str, tuple[str, str, list[str]]]) -> int:
+    workbook = load_workbook(db_path)
+    alias_sheet = ensure_sheet_headers(workbook, "Aliases", ALIASES_HEADERS)
+    existing = {
+        (
+            str(values[0] or "").strip().lower(),
+            str(values[1] or "").strip().lower(),
+        )
+        for values in alias_sheet.iter_rows(min_row=2, values_only=True)
+    }
+    added = 0
+    for canonical_description, (section, note, aliases) in aliases_by_description.items():
+        for alias in aliases:
+            alias_text = str(alias or "").strip()
+            if not alias_text:
+                continue
+            key = (alias_text.lower(), canonical_description.lower())
+            if key in existing:
+                continue
+            append_row(
+                alias_sheet,
+                ALIASES_HEADERS,
+                {
+                    "alias": alias_text,
+                    "canonical_term": canonical_description,
+                    "section_bias": section,
+                    "notes": note,
+                },
+            )
+            existing.add(key)
+            added += 1
+    if added:
+        workbook.save(db_path)
+    return added
+
+
+def _sync_priced_boq_records_to_schema(
+    db_path: str,
+    boq_path: str,
+    appended_records: list[dict[str, Any]],
+    aliases_by_description: dict[str, tuple[str, str, list[str]]],
+    ai_assist: bool = False,
+    config=None,
+) -> int:
+    from .ai.embedding_provider import get_embedding_provider
+    from .cost_schema import CostDatabase, build_cost_item, composed_embedding_text, schema_database_path
+
+    if not appended_records:
+        return 0
+    runtime_config = config or load_config()
+    provider = get_embedding_provider(runtime_config) if ai_assist else None
+    repository = CostDatabase(schema_database_path(db_path))
+    source = repository.register_source(Path(boq_path).stem, "priced-boq-import", boq_path)
+    cost_items = []
+    aliases_by_item: dict[str, list[str]] = {}
+    for record in appended_records:
+        description = str(record.get("description") or "").strip()
+        section = str(record.get("section") or "").strip()
+        keywords = [value.strip() for value in str(record.get("keywords") or "").split(",") if value.strip()]
+        item = build_cost_item(
+            code=str(record.get("item_code") or "").strip(),
+            description=description,
+            unit=str(record.get("unit") or ""),
+            category=section,
+            subcategory=str(record.get("subsection") or ""),
+            material=str(record.get("material_type") or ""),
+            keywords=keywords,
+            rate=safe_float(record.get("rate")) or 0.0,
+            source_id=source.id,
+        )
+        rule_aliases = list(aliases_by_description.get(description, ("", "", []))[2])
+        if ai_assist and provider is not None and hasattr(provider, "suggest_aliases"):
+            try:
+                suggested = [alias for alias in provider.suggest_aliases(description) if alias]
+                rule_aliases.extend(suggested)
+            except Exception:
+                pass
+        aliases_by_item[item.id] = list(dict.fromkeys(alias for alias in rule_aliases if normalize_text(alias) != normalize_text(description)))
+        cost_items.append(item)
+    repository.insert_items(cost_items, aliases_by_item=aliases_by_item)
+    repository.log_ingestion(source.id, "completed", f"Imported {len(cost_items)} priced BOQ item(s).")
+    if provider is not None:
+        for item in cost_items:
+            embedding = provider.embed(composed_embedding_text(item))
+            if embedding:
+                repository.save_embedding(item.id, embedding, getattr(provider, "model_name", "unknown"))
+    return len(cost_items)
+
+
+def _collect_priced_boq_aliases(
+    records: list[dict[str, Any]],
+    ai_assist: bool = False,
+    config=None,
+) -> tuple[dict[str, tuple[str, str, list[str]]], list[dict[str, Any]]]:
+    runtime_config = config or load_config()
+    provider = None
+    if ai_assist:
+        try:
+            from .ai.embedding_provider import get_embedding_provider
+
+            provider = get_embedding_provider(runtime_config)
+        except Exception:
+            provider = None
+
+    aliases_by_description: dict[str, tuple[str, str, list[str]]] = {}
+    alias_preview: list[dict[str, Any]] = []
+    for record in records:
+        description = str(record.get("description") or "").strip()
+        if not description:
+            continue
+        section = str(record.get("section") or "").strip()
+        rule_aliases = _style_aliases(description, section)
+        ai_aliases: list[str] = []
+        if ai_assist and provider is not None and hasattr(provider, "suggest_aliases"):
+            try:
+                ai_aliases = [alias for alias in provider.suggest_aliases(description) if alias]
+            except Exception:
+                ai_aliases = []
+        combined_aliases = list(
+            dict.fromkeys(
+                alias
+                for alias in [*rule_aliases, *ai_aliases]
+                if normalize_text(alias) != normalize_text(description)
+            )
+        )
+        aliases_by_description[description] = (
+            section,
+            "Derived from priced BOQ import",
+            rule_aliases,
+        )
+        alias_preview.append(
+            {
+                "description": description,
+                "section": section,
+                "rule_aliases": ", ".join(rule_aliases),
+                "ai_aliases": ", ".join(ai_aliases),
+                "combined_aliases": ", ".join(combined_aliases),
+            }
+        )
+    return aliases_by_description, alias_preview
+
+
+def _is_probable_pdf_heading(line: str) -> bool:
+    stripped = " ".join(str(line or "").split()).strip()
+    if not stripped:
+        return False
+    words = stripped.split()
+    digit_count = sum(char.isdigit() for char in stripped)
+    return digit_count <= 2 and len(words) <= 8 and (stripped.isupper() or len(words) <= 4)
+
+
+def _extract_priced_boq_pdf_rows(
+    boq_path: Path,
+    normalized_region: str,
+    source_label: str | None,
+    runtime_config,
+) -> tuple[list[dict[str, Any]], int, int]:
+    text = extract_text_from_pdf(str(boq_path), config=runtime_config)
+    extracted_rows: list[dict[str, Any]] = []
+    skipped_missing_rate = 0
+    skipped_missing_unit = 0
+    current_section = ""
+    pending_description = ""
+
+    for line_number, raw_line in enumerate(text.splitlines(), start=1):
+        line = " ".join(str(raw_line).split()).strip()
+        if not line:
+            continue
+        if _is_probable_pdf_heading(line):
+            current_section = line.title()
+            pending_description = ""
+            continue
+
+        parsed = _parse_priced_boq_pdf_line(line)
+        if parsed is None and pending_description:
+            parsed = _parse_priced_boq_pdf_line(f"{pending_description} {line}")
+            if parsed is not None:
+                pending_description = ""
+        if parsed is None:
+            if not any(normalize_unit(token) in {"m2", "m3", "m", "nr", "sum", "item", "kg", "km", "day", "hr", "ton"} for token in line.split()):
+                pending_description = line if len(line.split()) >= 3 else ""
+            continue
+
+        description, unit, rate = parsed
+        if not unit:
+            skipped_missing_unit += 1
+            continue
+        if rate is None or rate <= 0:
+            skipped_missing_rate += 1
+            continue
+
+        section = current_section or "Imported BOQ"
+        extracted_rows.append(
+            {
+                "item_code": _boq_import_code(normalized_region, section, description, unit),
+                "description": description,
+                "normalized_description": normalize_text(description),
+                "section": section,
+                "subsection": "",
+                "unit": unit,
+                "rate": rate,
+                "currency": "KES",
+                "region": normalized_region,
+                "source": source_label.strip() if source_label else boq_path.stem,
+                "source_sheet": "PDF",
+                "source_page": str(line_number),
+                "basis": "Imported from priced BOQ PDF review",
+                "crew_type": "",
+                "plant_type": "",
+                "material_type": "",
+                "keywords": _boq_keywords(description),
+                "alias_group": "",
+                "build_up_recipe_id": "",
+                "confidence_hint": 0.0,
+                "notes": f"Priced BOQ PDF import line {line_number}",
+                "active": True,
+            }
+        )
+    return extracted_rows, skipped_missing_rate, skipped_missing_unit
+
+
+def _parse_priced_boq_pdf_line(line: str) -> tuple[str, str, float | None] | None:
+    tokens = [token.strip() for token in str(line or "").split() if token.strip()]
+    if len(tokens) < 5:
+        return None
+
+    unit_index = -1
+    unit_value = ""
+    for index, token in enumerate(tokens):
+        normalized = normalize_unit(token)
+        if normalized in {"m2", "m3", "m", "nr", "sum", "item", "kg", "km", "day", "hr", "ton"}:
+            unit_index = index
+            unit_value = normalized
+            break
+    if unit_index <= 1 or unit_index >= len(tokens) - 1:
+        return None
+
+    trailing_tokens = tokens[unit_index + 1 :]
+    numeric_values = [safe_float(token.replace(",", "")) for token in trailing_tokens if PRICE_TOKEN_RE.match(token)]
+    numeric_values = [value for value in numeric_values if value is not None]
+    if len(numeric_values) < 2:
+        return None
+
+    description = " ".join(tokens[:unit_index]).strip(" -.,;:")
+    if len(description.split()) < 3:
+        return None
+    rate = numeric_values[1]
+    return description, unit_value, rate
+
+
+def _extract_priced_boq_rows(
+    boq_path: str,
+    region: str,
+    source_label: str | None = None,
+    config=None,
+    column_overrides: dict[str, int] | None = None,
+) -> tuple[list[dict[str, Any]], int, int]:
+    normalized_region = normalize_region_name(region)
+    if not normalized_region:
+        raise ValueError("Region is required for priced BOQ imports.")
+
+    boq_source = Path(boq_path)
+    runtime_config = config or load_config()
+    extracted_rows: list[dict[str, Any]] = []
+    skipped_missing_rate = 0
+    skipped_missing_unit = 0
+
+    if boq_source.suffix.lower() in {".xlsx", ".xlsm"}:
+        reader = WorkbookReader(runtime_config)
+        sheets = reader.read(str(boq_source), column_overrides or {})
+
+        for sheet in sheets:
+            default_section = classify_sheet_name(sheet.sheet_name) or sheet.sheet_name
+            for row in sheet.rows:
+                if row.is_heading or row.is_summary_row or not row.description:
+                    continue
+                if safe_float(row.rate) is None or safe_float(row.rate) <= 0:
+                    skipped_missing_rate += 1
+                    continue
+                if not normalize_unit(row.unit):
+                    skipped_missing_unit += 1
+                    continue
+
+                section = (row.inferred_section or default_section or sheet.sheet_name).strip()
+                description = str(row.description).strip()
+                unit = normalize_unit(str(row.unit))
+                extracted_rows.append(
+                    {
+                        "item_code": _boq_import_code(normalized_region, section, description, unit),
+                        "description": description,
+                        "normalized_description": normalize_text(description),
+                        "section": section,
+                        "subsection": "",
+                        "unit": unit,
+                        "rate": safe_float(row.rate) or 0.0,
+                        "currency": "KES",
+                        "region": normalized_region,
+                        "source": source_label.strip() if source_label else boq_source.stem,
+                        "source_sheet": sheet.sheet_name,
+                        "source_page": str(row.row_number),
+                        "basis": "Imported from priced BOQ review",
+                        "crew_type": "",
+                        "plant_type": "",
+                        "material_type": "",
+                        "keywords": _boq_keywords(description),
+                        "alias_group": "",
+                        "build_up_recipe_id": "",
+                        "confidence_hint": 0.0,
+                        "notes": f"Priced BOQ import from {sheet.sheet_name}!R{row.row_number}",
+                        "active": True,
+                    }
+                )
+    elif boq_source.suffix.lower() == ".pdf":
+        extracted_rows, skipped_missing_rate, skipped_missing_unit = _extract_priced_boq_pdf_rows(
+            boq_source,
+            normalized_region,
+            source_label,
+            runtime_config,
+        )
+    else:
+        raise ValueError("Priced BOQ import currently supports Excel workbooks and PDFs only.")
+
+    return extracted_rows, skipped_missing_rate, skipped_missing_unit
+
+
+def preview_priced_boq_import(
+    boq_path: str,
+    region: str,
+    source_label: str | None = None,
+    config=None,
+    column_overrides: dict[str, int] | None = None,
+    ai_assist: bool = False,
+    db_path: str | None = None,
+) -> BoqImportPreview:
+    """Preview priced BOQ extraction and style-learning output without writing to the database."""
+
+    extracted_rows, skipped_missing_rate, skipped_missing_unit = _extract_priced_boq_rows(
+        boq_path=boq_path,
+        region=region,
+        source_label=source_label,
+        config=config,
+        column_overrides=column_overrides,
+    )
+    _, alias_preview = _collect_priced_boq_aliases(
+        extracted_rows,
+        ai_assist=ai_assist,
+        config=config,
+    )
+    preview = BoqImportPreview(
+        source_file=boq_path,
+        region=normalize_region_name(region),
+        total_extracted=len(extracted_rows),
+        skipped_missing_rate=skipped_missing_rate,
+        skipped_missing_unit=skipped_missing_unit,
+        extracted_rows=extracted_rows,
+        alias_preview=alias_preview,
+    )
+    if db_path:
+        append_preview, candidate_preview, duplicate_preview = _classify_structured_import_rows(
+            db_path=db_path,
+            target_sheet="RateLibrary",
+            mapped_rows=extracted_rows,
+        )
+        preview.append_preview = append_preview
+        preview.candidate_preview = candidate_preview
+        preview.duplicate_preview = duplicate_preview
+        preview.append_count = len(append_preview)
+        preview.candidate_count = len(candidate_preview)
+        preview.duplicate_count = len(duplicate_preview)
+        preview.notes.append(
+            f"Dry run decision: {preview.append_count} row(s) would append, "
+            f"{preview.candidate_count} would go to CandidateMatches, and "
+            f"{preview.duplicate_count} would be skipped as same-rate duplicates."
+        )
+    if skipped_missing_rate:
+        preview.notes.append(f"Skipped {skipped_missing_rate} BOQ row(s) without a usable rate.")
+    if skipped_missing_unit:
+        preview.notes.append(f"Skipped {skipped_missing_unit} BOQ row(s) without a usable unit.")
+    if ai_assist:
+        preview.notes.append("AI-assisted alias suggestions are shown when an embedding provider is available.")
+    return preview
+
+
+def import_priced_boq(
+    db_path: str,
+    boq_path: str,
+    region: str,
+    source_label: str | None = None,
+    config=None,
+    column_overrides: dict[str, int] | None = None,
+    ai_assist: bool = False,
+) -> ImportSummary:
+    """Import priced BOQ rows into the review-first rate library workflow."""
+    normalized_region = normalize_region_name(region)
+    runtime_config = config or load_config()
+    boq_source = Path(boq_path)
+    extracted_rows, skipped_missing_rate, skipped_missing_unit = _extract_priced_boq_rows(
+        boq_path=boq_path,
+        region=region,
+        source_label=source_label,
+        config=runtime_config,
+        column_overrides=column_overrides,
+    )
+
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", suffix=".csv", delete=False) as handle:
+        fieldnames = [
+            "item_code", "description", "normalized_description", "section", "subsection", "unit", "rate", "currency",
+            "region", "source", "source_sheet", "source_page", "basis", "crew_type", "plant_type", "material_type",
+            "keywords", "alias_group", "build_up_recipe_id", "confidence_hint", "notes", "active",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in extracted_rows:
+            writer.writerow(row)
+        temp_csv = Path(handle.name)
+
+    try:
+        summary = import_structured_rows(
+            db_path=db_path,
+            input_path=str(temp_csv),
+            target_sheet="RateLibrary",
+            mapper=build_rate_library_row,
+            defaults={"region": normalized_region, "source": source_label.strip() if source_label else boq_source.stem},
+        )
+    finally:
+        temp_csv.unlink(missing_ok=True)
+
+    aliases_by_description, _ = _collect_priced_boq_aliases(
+        summary.appended_records,
+        ai_assist=ai_assist,
+        config=runtime_config,
+    )
+
+    alias_count = _sync_aliases_to_excel(db_path, aliases_by_description)
+    if alias_count:
+        summary.notes.append(f"Added {alias_count} BOQ-derived alias row(s) to Aliases.")
+
+    schema_count = _sync_priced_boq_records_to_schema(
+        db_path=db_path,
+        boq_path=boq_path,
+        appended_records=summary.appended_records,
+        aliases_by_description=aliases_by_description,
+        ai_assist=ai_assist,
+        config=runtime_config,
+    )
+    if schema_count:
+        summary.notes.append(f"Synced {schema_count} imported BOQ row(s) into the normalized schema.")
+
+    summary.total_rows = len(extracted_rows)
+    if skipped_missing_rate:
+        summary.notes.append(f"Skipped {skipped_missing_rate} BOQ row(s) without a usable rate.")
+    if skipped_missing_unit:
+        summary.notes.append(f"Skipped {skipped_missing_unit} BOQ row(s) without a usable unit.")
     return summary
 
 

@@ -10,7 +10,7 @@ from rapidfuzz import fuzz
 from .aliases import apply_aliases
 from .matching_engine import MatchingEngine
 from .models import AliasEntry, MatchResult, RateItem, BOQLine
-from .normalizer import normalize_unit
+from .normalizer import normalize_text, normalize_unit
 
 
 @dataclass(slots=True)
@@ -23,6 +23,7 @@ class MatchingWeights:
     unit_bonus: float
     alias_bonus: float
     unit_penalty: float
+    attribute_bonus: float
 
 
 class Matcher:
@@ -46,6 +47,8 @@ class Matcher:
         """Return the best matching rate item for a BOQ line."""
         normalized_query, alias_hits = apply_aliases(line.description, self.aliases)
         line.normalized_description = normalized_query
+        normalized_attributes = normalize_text(getattr(line, "spec_attributes", "") or "")
+        attribute_terms = {token for token in normalized_attributes.split() if len(token) > 2}
         alias_section_match = any(
             entry.section_bias and line.inferred_section and entry.section_bias.lower() == line.inferred_section.lower()
             for entry in alias_hits
@@ -103,6 +106,12 @@ class Matcher:
                 score += self.weights.alias_bonus
                 rationale.append("alias-section-bonus")
 
+            if attribute_terms:
+                attribute_score = self._attribute_overlap(attribute_terms, item)
+                if attribute_score > 0:
+                    score += attribute_score * self.weights.attribute_bonus
+                    rationale.append(f"attribute={attribute_score:.2f}")
+
             external_score, external_rationale = external_scores.get(item.item_code, (0.0, []))
             if effective_mode == "ai":
                 if not external_score:
@@ -112,6 +121,11 @@ class Matcher:
             elif effective_mode == "hybrid" and external_score:
                 score = external_score
                 rationale = list(external_rationale)
+
+            if self.matching_engine is not None and not (effective_mode in {"ai", "hybrid"} and external_score):
+                learning_adjustment, learning_notes = self.matching_engine.learning_adjustment(normalized_query, item.item_code)
+                score += learning_adjustment
+                rationale.extend(learning_notes)
 
             score += item.confidence_hint
             if fabs(description_score - partial_score) > 20:
@@ -153,3 +167,26 @@ class Matcher:
             commercial_review_flags=commercial_review_flags,
             rationale=best_rationale,
         )
+
+    @staticmethod
+    def _attribute_overlap(attribute_terms: set[str], item: RateItem) -> float:
+        if not attribute_terms:
+            return 0.0
+        item_terms = {
+            token
+            for token in normalize_text(
+                " ".join(
+                    [
+                        str(item.description or ""),
+                        str(item.material_type or ""),
+                        str(item.keywords or ""),
+                        str(item.notes or ""),
+                    ]
+                )
+            ).split()
+            if len(token) > 2
+        }
+        if not item_terms:
+            return 0.0
+        overlap = len(attribute_terms & item_terms)
+        return min(1.0, overlap / max(1, min(len(attribute_terms), 4)))

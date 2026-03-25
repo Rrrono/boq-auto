@@ -111,6 +111,7 @@ class ColumnMap:
     quantity_col: int | None = None
     rate_col: int | None = None
     amount_col: int | None = None
+    spec_attributes_col: int | None = None
 
 
 @dataclass(slots=True)
@@ -119,6 +120,7 @@ class BOQLine:
     row_number: int
     description: str
     unit: str = ""
+    spec_attributes: str = ""
     quantity: float | None = None
     rate: float | None = None
     amount: float | None = None
