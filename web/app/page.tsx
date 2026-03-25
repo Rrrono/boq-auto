@@ -1,6 +1,10 @@
-import Link from "next/link";
+"use client";
 
-import { listJobs } from "../lib/platform-api";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { useAuth } from "../components/auth-provider";
+import { type Job, getErrorMessage, listJobs } from "../lib/platform-api";
 
 const cards = [
   {
@@ -17,8 +21,46 @@ const cards = [
   },
 ];
 
-export default async function HomePage() {
-  const jobs = await listJobs().catch(() => []);
+export default function HomePage() {
+  const { configured, loading, user, getIdToken } = useAuth();
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [jobsError, setJobsError] = useState("");
+
+  useEffect(() => {
+    if (loading || (configured && !user)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadJobs() {
+      setLoadingJobs(true);
+      setJobsError("");
+      try {
+        const token = await getIdToken();
+        const nextJobs = await listJobs(token);
+        if (!cancelled) {
+          setJobs(nextJobs);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setJobs([]);
+          setJobsError(getErrorMessage(error, "The dashboard could not load jobs right now."));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingJobs(false);
+        }
+      }
+    }
+
+    void loadJobs();
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, getIdToken, loading, user]);
+
   const pricedJobs = jobs.filter((job) => job.runs.length > 0);
   const totalFiles = jobs.reduce((sum, job) => sum + job.files.length, 0);
   const totalRuns = jobs.reduce((sum, job) => sum + job.runs.length, 0);
@@ -45,22 +87,30 @@ export default async function HomePage() {
           </article>
         ))}
       </section>
+
+      {jobsError ? (
+        <section className="alertCard alertError">
+          <strong>Dashboard data is unavailable</strong>
+          <p>{jobsError}</p>
+        </section>
+      ) : null}
+
       <section className="metaGrid">
         <div className="metaRow">
           <strong>Jobs tracked</strong>
-          <span>{jobs.length}</span>
+          <span>{loadingJobs ? "Loading..." : jobs.length}</span>
         </div>
         <div className="metaRow">
           <strong>Files received</strong>
-          <span>{totalFiles}</span>
+          <span>{loadingJobs ? "Loading..." : totalFiles}</span>
         </div>
         <div className="metaRow">
           <strong>Pricing runs</strong>
-          <span>{totalRuns}</span>
+          <span>{loadingJobs ? "Loading..." : totalRuns}</span>
         </div>
         <div className="metaRow">
           <strong>Latest run</strong>
-          <span>{latestRun ? new Date(latestRun.created_at).toLocaleString() : "No runs yet"}</span>
+          <span>{loadingJobs ? "Loading..." : latestRun ? new Date(latestRun.created_at).toLocaleString() : "No runs yet"}</span>
         </div>
       </section>
       <section className="card">
@@ -73,7 +123,9 @@ export default async function HomePage() {
             Create Job
           </Link>
         </div>
-        {jobs.length === 0 ? (
+        {loadingJobs ? (
+          <div className="emptyState">Loading job workspaces...</div>
+        ) : jobs.length === 0 ? (
           <div className="emptyState">No jobs yet. Create the first workspace and upload a BOQ to start pricing.</div>
         ) : (
           <div className="tableWrap">
@@ -117,7 +169,7 @@ export default async function HomePage() {
         </article>
         <article className="card">
           <span className="pill">Next Layer</span>
-          <h3>What we’re building next</h3>
+          <h3>What we're building next</h3>
           <p>
             Better job review screens, a live price-check workflow, and a knowledge queue that surfaces flagged lines
             before they become trusted estimating data.

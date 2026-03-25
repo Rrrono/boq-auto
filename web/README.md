@@ -33,6 +33,13 @@ Copy-Item .env.local.example .env.local
 - the local API: `http://127.0.0.1:8080`
 - or the live Cloud Run API URL
 
+Set both variables so server-rendered and browser-authenticated requests agree:
+
+```powershell
+BOQ_AUTO_API_BASE_URL=http://127.0.0.1:8080
+NEXT_PUBLIC_BOQ_AUTO_API_BASE_URL=http://127.0.0.1:8080
+```
+
 If you also want local sign-in, add your Firebase web app values into `.env.local`:
 
 ```powershell
@@ -57,18 +64,20 @@ This app is intended to be deployed with Firebase App Hosting using `web/` as th
 Important notes:
 
 - `apphosting.yaml` lives in this directory because Firebase App Hosting expects configuration in the app root
-- `BOQ_AUTO_API_BASE_URL` is configured there for hosted runtime access to the BOQ AUTO API
+- both `BOQ_AUTO_API_BASE_URL` and `NEXT_PUBLIC_BOQ_AUTO_API_BASE_URL` are configured there so the app can talk to the API during build/runtime and from the browser
 - when creating the App Hosting backend, set the app root directory to `web`
 - hosted auth is enabled by explicitly exposing the Firebase web app values through `NEXT_PUBLIC_FIREBASE_*` variables in `apphosting.yaml`
 
 ## Firebase Auth
 
-The current auth layer is Phase 1 groundwork:
+The current auth layer now covers both the hosted frontend and the platform API:
 
 - hosted and local frontend sign-in via Firebase Auth
 - `/login` page
 - client-side route gating for the web workspace
 - sign-out from the sidebar
+- Firebase ID tokens passed from the browser to the protected API routes
+- backend verification of bearer tokens on jobs and insights endpoints
 
 Before login works, enable a provider in Firebase Console:
 
@@ -80,8 +89,8 @@ Before login works, enable a provider in Firebase Console:
 
 Current limitation:
 
-- frontend access is gated, but backend API token verification is not enforced yet
-- the next hardening step is passing Firebase ID tokens to the API and verifying them server-side
+- self-signup is still not available; users are created in Firebase Console
+- the legacy `/upload-boq` endpoint remains public for compatibility, while jobs and insights routes are protected
 
 Typical setup flow:
 

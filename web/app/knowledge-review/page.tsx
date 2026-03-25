@@ -1,14 +1,57 @@
-import { getKnowledgeQueue } from "../../lib/platform-api";
+"use client";
 
+import { useEffect, useState } from "react";
 
-export default async function KnowledgeReviewPage() {
-  const queue = await getKnowledgeQueue(40).catch(() => ({
-    scanned_jobs: 0,
-    candidate_count: 0,
-    unmatched_count: 0,
-    review_count: 0,
-    candidates: [],
-  }));
+import { useAuth } from "../../components/auth-provider";
+import { getErrorMessage, getKnowledgeQueue, type KnowledgeQueueResponse } from "../../lib/platform-api";
+
+const emptyQueue: KnowledgeQueueResponse = {
+  scanned_jobs: 0,
+  candidate_count: 0,
+  unmatched_count: 0,
+  review_count: 0,
+  candidates: [],
+};
+
+export default function KnowledgeReviewPage() {
+  const { configured, loading, user, getIdToken } = useAuth();
+  const [queue, setQueue] = useState<KnowledgeQueueResponse>(emptyQueue);
+  const [loadingQueue, setLoadingQueue] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (loading || (configured && !user)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadQueue() {
+      setLoadingQueue(true);
+      setError("");
+      try {
+        const token = await getIdToken();
+        const nextQueue = await getKnowledgeQueue(40, token);
+        if (!cancelled) {
+          setQueue(nextQueue);
+        }
+      } catch (nextError) {
+        if (!cancelled) {
+          setQueue(emptyQueue);
+          setError(getErrorMessage(nextError, "The knowledge review queue could not be loaded right now."));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingQueue(false);
+        }
+      }
+    }
+
+    void loadQueue();
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, getIdToken, loading, user]);
 
   return (
     <div className="stack">
@@ -21,29 +64,38 @@ export default async function KnowledgeReviewPage() {
         </p>
       </section>
 
+      {error ? (
+        <section className="alertCard alertError">
+          <strong>Review queue unavailable</strong>
+          <p>{error}</p>
+        </section>
+      ) : null}
+
       <section className="metaGrid">
         <div className="metaRow">
           <strong>Priced jobs scanned</strong>
-          <span>{queue.scanned_jobs}</span>
+          <span>{loadingQueue ? "Loading..." : queue.scanned_jobs}</span>
         </div>
         <div className="metaRow">
           <strong>Review queue</strong>
-          <span>{queue.candidate_count}</span>
+          <span>{loadingQueue ? "Loading..." : queue.candidate_count}</span>
         </div>
         <div className="metaRow">
           <strong>Unmatched lines</strong>
-          <span>{queue.unmatched_count}</span>
+          <span>{loadingQueue ? "Loading..." : queue.unmatched_count}</span>
         </div>
         <div className="metaRow">
           <strong>Manual review lines</strong>
-          <span>{queue.review_count}</span>
+          <span>{loadingQueue ? "Loading..." : queue.review_count}</span>
         </div>
       </section>
 
       <section className="card">
         <span className="pill">Live Queue</span>
         <h3>Flagged rows from recent jobs</h3>
-        {queue.candidates.length === 0 ? (
+        {loadingQueue ? (
+          <div className="emptyState">Loading recent review candidates...</div>
+        ) : queue.candidates.length === 0 ? (
           <div className="emptyState">
             No flagged rows are available yet. Once more jobs are priced, this page will highlight the weakest matching
             areas for review-first database improvement.

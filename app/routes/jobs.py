@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.auth import AuthenticatedUser, require_authenticated_user
 from app.db import get_db
 from app.models.job import JobCreateRequest, JobPricingResponse, JobResponse
 from app.services.jobs import add_job_file, create_job, get_job, list_jobs, price_job_boq, serialize_job
@@ -14,18 +15,29 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("", response_model=JobResponse)
-def create_job_endpoint(payload: JobCreateRequest, db: Session = Depends(get_db)) -> JobResponse:
+def create_job_endpoint(
+    payload: JobCreateRequest,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_authenticated_user),
+) -> JobResponse:
     job = create_job(db, payload.title, payload.region)
     return serialize_job(job)
 
 
 @router.get("", response_model=list[JobResponse])
-def list_jobs_endpoint(db: Session = Depends(get_db)) -> list[JobResponse]:
+def list_jobs_endpoint(
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_authenticated_user),
+) -> list[JobResponse]:
     return [serialize_job(job) for job in list_jobs(db)]
 
 
 @router.get("/{job_id}", response_model=JobResponse)
-def get_job_endpoint(job_id: str, db: Session = Depends(get_db)) -> JobResponse:
+def get_job_endpoint(
+    job_id: str,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_authenticated_user),
+) -> JobResponse:
     job = get_job(db, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found.")
@@ -38,6 +50,7 @@ async def upload_job_file(
     file_type: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> JobResponse:
     job = get_job(db, job_id)
     if job is None:
@@ -51,7 +64,11 @@ async def upload_job_file(
 
 
 @router.post("/{job_id}/price-boq", response_model=JobPricingResponse)
-def price_job_boq_endpoint(job_id: str, db: Session = Depends(get_db)) -> JobPricingResponse:
+def price_job_boq_endpoint(
+    job_id: str,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_authenticated_user),
+) -> JobPricingResponse:
     job = get_job(db, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found.")
@@ -63,7 +80,11 @@ def price_job_boq_endpoint(job_id: str, db: Session = Depends(get_db)) -> JobPri
 
 
 @router.get("/{job_id}/results")
-def get_job_results_endpoint(job_id: str, db: Session = Depends(get_db)) -> dict:
+def get_job_results_endpoint(
+    job_id: str,
+    db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_authenticated_user),
+) -> dict:
     job = get_job(db, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found.")

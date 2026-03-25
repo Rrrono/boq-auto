@@ -1,48 +1,199 @@
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-import { getJob, getJobResults, priceJob, uploadJobFile } from "../../../lib/platform-api";
+import { useAuth } from "../../../components/auth-provider";
+import {
+  type Job,
+  type PricingResult,
+  getErrorMessage,
+  getJob,
+  getJobResults,
+  priceJob,
+  uploadJobFile,
+} from "../../../lib/platform-api";
 
+export default function JobDetailPage() {
+  const params = useParams<{ jobId: string }>();
+  const jobId = params.jobId;
+  const { configured, loading, user, getIdToken } = useAuth();
+  const [job, setJob] = useState<Job | null>(null);
+  const [pricing, setPricing] = useState<PricingResult | null>(null);
+  const [loadingWorkspace, setLoadingWorkspace] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [pricingRunBusy, setPricingRunBusy] = useState(false);
 
-async function uploadBoqAction(formData: FormData) {
-  "use server";
+  useEffect(() => {
+    if (loading || (configured && !user) || !jobId) {
+      return;
+    }
 
-  const jobId = String(formData.get("jobId") || "");
-  const file = formData.get("file");
-  if (!jobId || !(file instanceof File) || !file.size) {
-    return;
+    let cancelled = false;
+
+    async function loadWorkspace() {
+      setLoadingWorkspace(true);
+      setWorkspaceError("");
+      try {
+        const token = await getIdToken();
+        const [nextJob, nextPricing] = await Promise.all([
+          getJob(jobId, token),
+          getJobResults(jobId, token).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setJob(nextJob);
+          setPricing(nextPricing);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setJob(null);
+          setPricing(null);
+          setWorkspaceError(getErrorMessage(error, "This job workspace could not be loaded right now."));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingWorkspace(false);
+        }
+      }
+    }
+
+    void loadWorkspace();
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, getIdToken, jobId, loading, user]);
+
+  const latestRun = job?.runs[0] ?? null;
+  const boqFile = job?.files.find((file) => file.file_type === "boq") ?? null;
+  const matchedPercent = useMemo(() => {
+    if (!pricing || pricing.summary.item_count <= 0) {
+      return null;
+    }
+    return Math.round((pricing.summary.matched_count / pricing.summary.item_count) * 100);
+  }, [pricing]);
+  const flaggedPercent = useMemo(() => {
+    if (!pricing || pricing.summary.item_count <= 0) {
+      return null;
+    }
+    return Math.round((pricing.summary.flagged_count / pricing.summary.item_count) * 100);
+  }, [pricing]);
+
+  async function reloadWorkspace(nextNotice?: string) {
+    if (!jobId) {
+      return;
+    }
+    setLoadingWorkspace(true);
+    setWorkspaceError("");
+    setActionError("");
+    if (nextNotice) {
+      setNotice(nextNotice);
+    }
+    try {
+      const token = await getIdToken();
+      const [nextJob, nextPricing] = await Promise.all([
+        getJob(jobId, token),
+        getJobResults(jobId, token).catch(() => null),
+      ]);
+      setJob(nextJob);
+      setPricing(nextPricing);
+    } catch (error) {
+      setJob(null);
+      setPricing(null);
+      setWorkspaceError(getErrorMessage(error, "The workspace could not be refreshed after that action."));
+    } finally {
+      setLoadingWorkspace(false);
+    }
   }
-  await uploadJobFile(jobId, file, "boq");
-  redirect(`/jobs/${jobId}`);
-}
 
+  async function onUploadSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!jobId) {
+      return;
+    }
+    if (!selectedFile) {
+      setActionError("Choose a BOQ workbook before uploading.");
+      return;
+    }
 
-async function priceBoqAction(formData: FormData) {
-  "use server";
-
-  const jobId = String(formData.get("jobId") || "");
-  if (!jobId) {
-    return;
+    setUploading(true);
+    setActionError("");
+    setNotice("");
+    try {
+      const token = await getIdToken();
+      await uploadJobFile(jobId, selectedFile, "boq", token);
+      setSelectedFile(null);
+      await reloadWorkspace("BOQ uploaded successfully.");
+    } catch (error) {
+      setActionError(getErrorMessage(error, "BOQ upload failed."));
+    } finally {
+      setUploading(false);
+    }
   }
-  await priceJob(jobId);
-  redirect(`/jobs/${jobId}`);
-}
 
+  async function onPriceClick() {
+    if (!jobId) {
+      return;
+    }
 
-export default async function JobDetailPage({ params }: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await params;
-  const job = await getJob(jobId);
-  const pricing = await getJobResults(jobId).catch(() => null);
-  const latestRun = job.runs[0] ?? null;
-  const boqFile = job.files.find((file) => file.file_type === "boq") ?? null;
-  const matchedPercent =
-    pricing && pricing.summary.item_count > 0
-      ? Math.round((pricing.summary.matched_count / pricing.summary.item_count) * 100)
-      : null;
-  const flaggedPercent =
-    pricing && pricing.summary.item_count > 0
-      ? Math.round((pricing.summary.flagged_count / pricing.summary.item_count) * 100)
-      : null;
+    setPricingRunBusy(true);
+    setActionError("");
+    setNotice("");
+    try {
+      const token = await getIdToken();
+      const response = await priceJob(jobId, token);
+      setJob(response.job);
+      setPricing(response.pricing);
+      setNotice("Pricing run completed.");
+    } catch (error) {
+      setActionError(getErrorMessage(error, "Pricing could not start for this job."));
+    } finally {
+      setPricingRunBusy(false);
+    }
+  }
+
+  if (loadingWorkspace) {
+    return (
+      <div className="stack">
+        <section className="hero">
+          <span className="eyebrow">Job Workspace</span>
+          <h2 className="headline">Loading workspace...</h2>
+          <p className="lead">Pulling job files, latest run details, and pricing output from the platform API.</p>
+        </section>
+      </div>
+    );
+  }
+
+  if (workspaceError || !job) {
+    return (
+      <div className="stack">
+        <section className="hero">
+          <span className="eyebrow">Job Workspace</span>
+          <h2 className="headline">This job workspace is temporarily unavailable.</h2>
+          <p className="lead">
+            The hosted frontend reached the API, but the workspace data did not come back cleanly. Retry from the
+            dashboard instead of hitting a generic application crash.
+          </p>
+        </section>
+        <section className="card">
+          <span className="pill">Workspace Status</span>
+          <p className="errorText">{workspaceError || "No workspace data is available right now."}</p>
+          <div className="inlineActions">
+            <button type="button" onClick={() => void reloadWorkspace()}>
+              Retry workspace
+            </button>
+            <Link className="secondaryButton" href="/">
+              Return to dashboard
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="stack">
@@ -53,6 +204,20 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
           Region {job.region}. Upload a BOQ, trigger pricing, and review the latest line-level decisions from the API.
         </p>
       </section>
+
+      {actionError ? (
+        <section className="alertCard alertError">
+          <strong>Job action failed</strong>
+          <p>{actionError}</p>
+        </section>
+      ) : null}
+
+      {notice ? (
+        <section className="alertCard alertSuccess">
+          <strong>Workspace updated</strong>
+          <p>{notice}</p>
+        </section>
+      ) : null}
 
       <section className="metaGrid">
         <div className="metaRow">
@@ -77,13 +242,20 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
         <article className="card">
           <span className="pill">Upload</span>
           <h3>Attach source file</h3>
-          <form className="form" action={uploadBoqAction}>
-            <input type="hidden" name="jobId" value={job.id} />
+          <form className="form" onSubmit={onUploadSubmit}>
             <label>
               BOQ file
-              <input type="file" name="file" accept=".xlsx,.xlsm" required />
+              <input
+                type="file"
+                name="file"
+                accept=".xlsx,.xlsm"
+                required
+                onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+              />
             </label>
-            <button type="submit">Upload BOQ</button>
+            <button type="submit" disabled={uploading}>
+              {uploading ? "Uploading..." : "Upload BOQ"}
+            </button>
           </form>
           <p className="helperText">
             Phase 1 pricing uses the latest uploaded BOQ workbook. Tender/spec/manual uploads can be added next through
@@ -93,12 +265,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
         <article className="card">
           <span className="pill">Run</span>
           <h3>Price the uploaded BOQ</h3>
-          <form className="form" action={priceBoqAction}>
-            <input type="hidden" name="jobId" value={job.id} />
-            <button type="submit" disabled={!boqFile}>
-              Run Pricing
-            </button>
-          </form>
+          <button type="button" onClick={() => void onPriceClick()} disabled={!boqFile || pricingRunBusy}>
+            {pricingRunBusy ? "Running pricing..." : "Run Pricing"}
+          </button>
           <p className="helperText">
             {boqFile
               ? `Latest BOQ: ${boqFile.filename}`
@@ -145,26 +314,24 @@ export default async function JobDetailPage({ params }: { params: Promise<{ jobI
         <span className="pill">Run History</span>
         <h3>Latest execution</h3>
         {latestRun ? (
-          <>
-            <div className="metaGrid">
-              <div className="metaRow">
-                <strong>Run type</strong>
-                <span>{latestRun.run_type}</span>
-              </div>
-              <div className="metaRow">
-                <strong>Status</strong>
-                <span className="statusPill">{latestRun.status}</span>
-              </div>
-              <div className="metaRow">
-                <strong>Output workbook</strong>
-                <span className="monoText">{latestRun.output_storage_uri || "-"}</span>
-              </div>
-              <div className="metaRow">
-                <strong>Audit JSON</strong>
-                <span className="monoText">{latestRun.audit_storage_uri || "-"}</span>
-              </div>
+          <div className="metaGrid">
+            <div className="metaRow">
+              <strong>Run type</strong>
+              <span>{latestRun.run_type}</span>
             </div>
-          </>
+            <div className="metaRow">
+              <strong>Status</strong>
+              <span className="statusPill">{latestRun.status}</span>
+            </div>
+            <div className="metaRow">
+              <strong>Output workbook</strong>
+              <span className="monoText">{latestRun.output_storage_uri || "-"}</span>
+            </div>
+            <div className="metaRow">
+              <strong>Audit JSON</strong>
+              <span className="monoText">{latestRun.audit_storage_uri || "-"}</span>
+            </div>
+          </div>
         ) : (
           <div className="emptyState">No runs yet. This panel will show the latest workbook and audit artifact URIs.</div>
         )}

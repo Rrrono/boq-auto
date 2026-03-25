@@ -265,7 +265,24 @@ The current Phase 1 browser flow supports:
 - reviewing the latest pricing summary and first line-level results in the browser
 - reviewing recent price observations through the price checker
 - surfacing flagged and unmatched rows through the knowledge review queue
-- signing into the hosted frontend with Firebase Auth groundwork enabled
+- signing into the hosted frontend with Firebase Auth
+- calling protected jobs and insights routes with Firebase bearer tokens from the browser
+
+Protected platform routes now require `Authorization: Bearer <firebase_id_token>`:
+
+- `POST /jobs`
+- `GET /jobs`
+- `GET /jobs/{job_id}`
+- `POST /jobs/{job_id}/files`
+- `POST /jobs/{job_id}/price-boq`
+- `GET /jobs/{job_id}/results`
+- `GET /price-check`
+- `GET /knowledge/candidates`
+
+Compatibility notes:
+
+- `GET /health` stays public
+- `POST /upload-boq` stays public during this phase for compatibility with the direct BOQ flow
 
 Deploy the frontend with Firebase App Hosting:
 

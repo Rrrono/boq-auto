@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 from app.services.storage import download_gcs_uri
 
 
-LOCAL_JOB_STORAGE_ROOT = Path(os.getenv("BOQ_AUTO_LOCAL_STORAGE_ROOT", "/tmp/boq_auto_jobs"))
+LOCAL_JOB_STORAGE_ROOT = Path(os.getenv("BOQ_AUTO_LOCAL_STORAGE_ROOT", str(Path(tempfile.gettempdir()) / "boq_auto_jobs")))
 
 
 def store_job_file(job_id: str, file_type: str, filename: str, content: bytes) -> str:

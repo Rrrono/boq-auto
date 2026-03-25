@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.auth import AuthenticatedUser, require_authenticated_user
 from app.db import get_db
 from app.models.insights import KnowledgeQueueResponse, PriceCheckResponse
 from app.services.insights import build_knowledge_queue, search_price_observations
@@ -18,6 +19,7 @@ def price_check_endpoint(
     q: str = Query(default="", description="Free-text search phrase"),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> PriceCheckResponse:
     return search_price_observations(db, q, limit=limit)
 
@@ -26,5 +28,6 @@ def price_check_endpoint(
 def knowledge_candidates_endpoint(
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
+    _: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> KnowledgeQueueResponse:
     return build_knowledge_queue(db, limit=limit)

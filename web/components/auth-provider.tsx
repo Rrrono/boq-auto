@@ -19,6 +19,7 @@ type AuthContextValue = {
   user: User | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOutUser: () => Promise<void>;
+  getIdToken: () => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -69,6 +70,12 @@ export function AuthProvider({
         }
         const auth = getAuth(getFirebaseApp(firebaseConfig));
         await signOut(auth);
+      },
+      async getIdToken() {
+        if (!firebaseConfig || !user) {
+          return null;
+        }
+        return user.getIdToken();
       },
     }),
     [firebaseConfig, loading, user],

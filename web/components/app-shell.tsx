@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return "Checking session...";
     }
     if (user?.email) {
-      return user.email;
+      return `Signed in as ${user.email}`;
     }
     return "Signed out";
   }, [configured, loading, user]);
@@ -73,8 +73,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="authPanel">
           <span className="pill">Access</span>
           <p className="helperText">{authSummary}</p>
+          {configured ? (
+            <p className="helperText">This browser stays signed in until you use Sign Out.</p>
+          ) : (
+            <p className="helperText">Add Firebase web config to enable sign-in for the hosted workspace.</p>
+          )}
+          {!loading && configured && !user && !isLoginPage ? (
+            <Link className="secondaryButton" href="/login">
+              Sign In
+            </Link>
+          ) : null}
           {configured && user ? (
-            <button type="button" className="secondaryButton" onClick={() => void signOutUser()}>
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={() => {
+                void signOutUser().finally(() => {
+                  router.replace("/login");
+                  router.refresh();
+                });
+              }}
+            >
               Sign Out
             </button>
           ) : null}

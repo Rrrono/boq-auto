@@ -21,7 +21,7 @@ export function LoginForm() {
     if (user?.email) {
       return `Signed in as ${user.email}`;
     }
-    return "Use a Firebase Auth account with Email/Password enabled.";
+    return "Use a Firebase Auth account with Email/Password enabled. Accounts are created in Firebase Console; self-signup is not live yet.";
   }, [configured, user]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {

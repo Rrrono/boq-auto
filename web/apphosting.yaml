@@ -14,6 +14,11 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: NEXT_PUBLIC_BOQ_AUTO_API_BASE_URL
+    value: "https://boq-auto-api-kwtvam3qtq-uc.a.run.app"
+    availability:
+      - BUILD
+      - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: "AIzaSyDCK7CYT-wWWAydb1UUmKInftz2Ngqu9aM"
     availability:

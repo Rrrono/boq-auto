@@ -75,6 +75,8 @@ a {
   border-radius: 18px;
   padding: 14px;
   background: rgba(255, 255, 255, 0.7);
+  display: grid;
+  gap: 10px;
 }
 
 .hero {
@@ -282,6 +284,42 @@ th {
 .errorText {
   margin: 0;
   color: #9c2f2f;
+}
+
+.alertCard {
+  border-radius: 18px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+}
+
+.alertCard strong,
+.alertCard p {
+  display: block;
+  margin: 0;
+}
+
+.alertCard p {
+  margin-top: 6px;
+}
+
+.alertError {
+  background: #fff0ec;
+  border-color: #e1b1a6;
+  color: #8f3225;
+}
+
+.alertSuccess {
+  background: #edf7ef;
+  border-color: #b8d6bd;
+  color: #29573b;
+}
+
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
 }
 
 @media (max-width: 920px) {

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
-from app.settings import _build_database_url, read_secret_value
+from app.settings import _build_database_url, load_settings, read_secret_value
 
 
 def test_build_database_url_for_cloud_sql_socket() -> None:
@@ -43,9 +44,22 @@ def test_build_database_url_falls_back_to_sqlite() -> None:
     assert url == "sqlite+pysqlite:///./boq_auto_web.db"
 
 
-def test_read_secret_value_from_file(monkeypatch, tmp_path: Path) -> None:
-    secret_file = tmp_path / "db_password.txt"
-    secret_file.write_text("from-file-value\n", encoding="utf-8")
+def test_read_secret_value_from_file(monkeypatch) -> None:
+    with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8") as handle:
+        handle.write("from-file-value\n")
+        secret_file = Path(handle.name)
+
     monkeypatch.delenv("BOQ_AUTO_DB_PASSWORD", raising=False)
     monkeypatch.setenv("BOQ_AUTO_DB_PASSWORD_FILE", str(secret_file))
     assert read_secret_value("BOQ_AUTO_DB_PASSWORD") == "from-file-value"
+
+
+def test_load_settings_enables_firebase_auth_when_project_is_available(monkeypatch) -> None:
+    monkeypatch.delenv("BOQ_AUTO_FIREBASE_PROJECT_ID", raising=False)
+    monkeypatch.delenv("BOQ_AUTO_FIREBASE_AUTH_ENABLED", raising=False)
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "demo-project")
+
+    settings = load_settings()
+
+    assert settings.firebase_project_id == "demo-project"
+    assert settings.firebase_auth_enabled is True

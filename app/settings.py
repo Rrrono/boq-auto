@@ -30,6 +30,15 @@ class WebPlatformSettings:
     db_password: str
     db_host: str
     db_port: str
+    firebase_auth_enabled: bool
+    firebase_project_id: str
+
+
+def read_bool_env(name: str, *, default: bool = False) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
 
 
 def load_settings() -> WebPlatformSettings:
@@ -40,6 +49,15 @@ def load_settings() -> WebPlatformSettings:
     db_password = read_secret_value("BOQ_AUTO_DB_PASSWORD")
     db_host = os.getenv("BOQ_AUTO_DB_HOST", "").strip()
     db_port = os.getenv("BOQ_AUTO_DB_PORT", "5432").strip()
+    firebase_project_id = (
+        os.getenv("BOQ_AUTO_FIREBASE_PROJECT_ID", "").strip()
+        or os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+        or os.getenv("GCLOUD_PROJECT", "").strip()
+    )
+    firebase_auth_enabled = read_bool_env(
+        "BOQ_AUTO_FIREBASE_AUTH_ENABLED",
+        default=bool(firebase_project_id),
+    )
 
     database_url = explicit_database_url or _build_database_url(
         cloud_sql_connection_name=cloud_sql_connection_name,
@@ -58,6 +76,8 @@ def load_settings() -> WebPlatformSettings:
         db_password=db_password,
         db_host=db_host,
         db_port=db_port,
+        firebase_auth_enabled=firebase_auth_enabled,
+        firebase_project_id=firebase_project_id,
     )
 
 

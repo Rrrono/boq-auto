@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 from app.models.boq import BoqProcessingResponse, CostSummary, ParsedBoqItem
@@ -19,7 +19,7 @@ from src.release_manager import current_production_database_path
 
 
 LOGGER = logging.getLogger("boq_auto.api.cost_engine")
-RUNTIME_DB_ROOT = Path("/tmp/boq_auto_runtime_db")
+RUNTIME_DB_ROOT = Path(tempfile.gettempdir()) / "boq_auto_runtime_db"
 
 
 def process_boq_upload(file_bytes: bytes, filename: str, region: str) -> BoqProcessingResponse:
@@ -33,52 +33,52 @@ def process_boq_upload(file_bytes: bytes, filename: str, region: str) -> BoqProc
     pricing_engine = PricingEngine(config, cloud_logger)
     request_id = uuid4().hex
 
-    with TemporaryDirectory(prefix="boq_auto_api_") as temp_dir:
-        temp_root = Path(temp_dir)
-        input_path = temp_root / filename
-        output_path = temp_root / f"{Path(filename).stem}_processed.xlsx"
-        input_path.write_bytes(file_bytes)
+    temp_root = Path(tempfile.gettempdir()) / "boq_auto_api_runtime" / request_id
+    temp_root.mkdir(parents=True, exist_ok=True)
+    input_path = temp_root / filename
+    output_path = temp_root / f"{Path(filename).stem}_processed.xlsx"
+    input_path.write_bytes(file_bytes)
 
-        artifacts = pricing_engine.price_workbook(
-            db_path=str(db_path),
-            boq_path=str(input_path),
-            output_path=str(output_path),
-            region=region,
-            apply_rates=True,
-            matching_mode=str(config.get("matching.mode", "rule")),
-        )
+    artifacts = pricing_engine.price_workbook(
+        db_path=str(db_path),
+        boq_path=str(input_path),
+        output_path=str(output_path),
+        region=region,
+        apply_rates=True,
+        matching_mode=str(config.get("matching.mode", "rule")),
+    )
 
-        workbook_bytes = output_path.read_bytes()
-        items = _load_response_items(artifacts.audit_json)
-        summary = _build_summary(items, artifacts, region, config.default_currency)
-        stored = persist_artifacts(
-            request_id=request_id,
-            source_filename=filename,
-            input_bytes=file_bytes,
-            output_bytes=workbook_bytes,
-            audit_json_path=artifacts.audit_json,
-        )
-        LOGGER.info(
-            "processed_boq | filename=%s | db=%s | region=%s | items=%s | matched=%s | flagged=%s",
-            filename,
-            db_path,
-            region,
-            artifacts.processed,
-            artifacts.matched,
-            artifacts.flagged,
-        )
-        return BoqProcessingResponse(
-            filename=filename,
-            output_filename=output_path.name,
-            region=region,
-            summary=summary,
-            items=items,
-            database_path=str(db_path),
-            input_storage_uri=stored.input_storage_uri,
-            output_storage_uri=stored.output_storage_uri,
-            audit_storage_uri=stored.audit_storage_uri,
-            workbook_bytes=workbook_bytes,
-        )
+    workbook_bytes = output_path.read_bytes()
+    items = _load_response_items(artifacts.audit_json)
+    summary = _build_summary(items, artifacts, region, config.default_currency)
+    stored = persist_artifacts(
+        request_id=request_id,
+        source_filename=filename,
+        input_bytes=file_bytes,
+        output_bytes=workbook_bytes,
+        audit_json_path=artifacts.audit_json,
+    )
+    LOGGER.info(
+        "processed_boq | filename=%s | db=%s | region=%s | items=%s | matched=%s | flagged=%s",
+        filename,
+        db_path,
+        region,
+        artifacts.processed,
+        artifacts.matched,
+        artifacts.flagged,
+    )
+    return BoqProcessingResponse(
+        filename=filename,
+        output_filename=output_path.name,
+        region=region,
+        summary=summary,
+        items=items,
+        database_path=str(db_path),
+        input_storage_uri=stored.input_storage_uri,
+        output_storage_uri=stored.output_storage_uri,
+        audit_storage_uri=stored.audit_storage_uri,
+        workbook_bytes=workbook_bytes,
+    )
 
 
 def _resolve_database_path(config) -> Path:

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -60,10 +60,10 @@ def price_job_boq(db: Session, job: Job) -> tuple[Job, dict]:
     if boq_file is None:
         raise ValueError("No BOQ file has been uploaded for this job.")
 
-    with TemporaryDirectory(prefix="boq_auto_job_") as temp_dir:
-        temp_root = Path(temp_dir)
-        local_input = materialize_uri(boq_file.storage_uri, temp_root / boq_file.filename)
-        result = process_boq_upload(file_bytes=local_input.read_bytes(), filename=boq_file.filename, region=job.region)
+    temp_root = Path(tempfile.gettempdir()) / "boq_auto_runtime" / job.id / uuid4().hex
+    temp_root.mkdir(parents=True, exist_ok=True)
+    local_input = materialize_uri(boq_file.storage_uri, temp_root / boq_file.filename)
+    result = process_boq_upload(file_bytes=local_input.read_bytes(), filename=boq_file.filename, region=job.region)
 
     run = JobRun(
         job_id=job.id,
