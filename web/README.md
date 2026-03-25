@@ -59,7 +59,7 @@ Important notes:
 - `apphosting.yaml` lives in this directory because Firebase App Hosting expects configuration in the app root
 - `BOQ_AUTO_API_BASE_URL` is configured there for hosted runtime access to the BOQ AUTO API
 - when creating the App Hosting backend, set the app root directory to `web`
-- Firebase App Hosting already provides `FIREBASE_WEBAPP_CONFIG` during build, which the app uses to initialize hosted Firebase Auth
+- hosted auth is enabled by explicitly exposing the Firebase web app values through `NEXT_PUBLIC_FIREBASE_*` variables in `apphosting.yaml`
 
 ## Firebase Auth
 
