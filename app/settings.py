@@ -32,6 +32,7 @@ class WebPlatformSettings:
     db_port: str
     firebase_auth_enabled: bool
     firebase_project_id: str
+    allowed_origins: list[str]
 
 
 def read_bool_env(name: str, *, default: bool = False) -> bool:
@@ -39,6 +40,13 @@ def read_bool_env(name: str, *, default: bool = False) -> bool:
     if not raw:
         return default
     return raw in {"1", "true", "yes", "on"}
+
+
+def read_csv_env(name: str) -> list[str]:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 def load_settings() -> WebPlatformSettings:
@@ -58,6 +66,18 @@ def load_settings() -> WebPlatformSettings:
         "BOQ_AUTO_FIREBASE_AUTH_ENABLED",
         default=bool(firebase_project_id),
     )
+    app_hosting_backend = os.getenv("BOQ_AUTO_APP_HOSTING_BACKEND", "boq-auto-web").strip() or "boq-auto-web"
+    app_hosting_region = os.getenv("BOQ_AUTO_APP_HOSTING_REGION", "us-central1").strip() or "us-central1"
+    allowed_origins = read_csv_env("BOQ_AUTO_ALLOWED_ORIGINS")
+    if not allowed_origins:
+        allowed_origins = [
+            "http://127.0.0.1:3000",
+            "http://localhost:3000",
+        ]
+        if firebase_project_id:
+            allowed_origins.append(
+                f"https://{app_hosting_backend}--{firebase_project_id}.{app_hosting_region}.hosted.app"
+            )
 
     database_url = explicit_database_url or _build_database_url(
         cloud_sql_connection_name=cloud_sql_connection_name,
@@ -78,6 +98,7 @@ def load_settings() -> WebPlatformSettings:
         db_port=db_port,
         firebase_auth_enabled=firebase_auth_enabled,
         firebase_project_id=firebase_project_id,
+        allowed_origins=allowed_origins,
     )
 
 

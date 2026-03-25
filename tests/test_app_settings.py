@@ -63,3 +63,14 @@ def test_load_settings_enables_firebase_auth_when_project_is_available(monkeypat
 
     assert settings.firebase_project_id == "demo-project"
     assert settings.firebase_auth_enabled is True
+
+
+def test_load_settings_builds_default_allowed_origins(monkeypatch) -> None:
+    monkeypatch.delenv("BOQ_AUTO_ALLOWED_ORIGINS", raising=False)
+    monkeypatch.setenv("BOQ_AUTO_FIREBASE_PROJECT_ID", "demo-project")
+
+    settings = load_settings()
+
+    assert "http://127.0.0.1:3000" in settings.allowed_origins
+    assert "http://localhost:3000" in settings.allowed_origins
+    assert "https://boq-auto-web--demo-project.us-central1.hosted.app" in settings.allowed_origins
