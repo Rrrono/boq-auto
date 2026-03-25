@@ -9,16 +9,10 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-
-def _database_url() -> str:
-    explicit = os.getenv("BOQ_AUTO_DATABASE_URL", "").strip()
-    if explicit:
-        return explicit
-    return "sqlite+pysqlite:///./boq_auto_web.db"
-
-
-DATABASE_URL = _database_url()
-ENGINE_KWARGS = {"future": True}
+from app.settings import load_settings
+SETTINGS = load_settings()
+DATABASE_URL = SETTINGS.database_url
+ENGINE_KWARGS = {"future": True, "pool_pre_ping": True}
 if DATABASE_URL.startswith("sqlite"):
     ENGINE_KWARGS["connect_args"] = {"check_same_thread": False}
 

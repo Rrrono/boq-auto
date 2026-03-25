@@ -160,6 +160,40 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy_cloud_run.ps1 `
   -BucketName "your-boq-auto-bucket"
 ```
 
+To attach Cloud Run to Cloud SQL and Secret Manager for the web platform layer, provision the runtime service account with:
+
+- `roles/cloudsql.client`
+- `roles/secretmanager.secretAccessor`
+
+Create the database password secret once:
+
+```powershell
+"your-strong-db-password" | gcloud secrets create boq-auto-db-password --data-file=-
+```
+
+Then deploy with the extra Cloud SQL parameters:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\deploy_cloud_run.ps1 `
+  -ProjectId "your-gcp-project-id" `
+  -Region "us-central1" `
+  -ServiceName "boq-auto-api" `
+  -BucketName "your-boq-auto-bucket" `
+  -ServiceAccount "boq-auto-runtime@your-gcp-project-id.iam.gserviceaccount.com" `
+  -CloudSqlConnectionName "your-gcp-project-id:us-central1:boq-auto-db" `
+  -DbName "boq_auto" `
+  -DbUser "boq_auto_user" `
+  -DbPasswordSecret "boq-auto-db-password"
+```
+
+That deployment helper now:
+
+- deploys the image
+- sets `BOQ_AUTO_CLOUD_SQL_CONNECTION_NAME`, DB name, and DB user
+- attaches the Cloud SQL instance to the Cloud Run service
+- mounts the DB password into `BOQ_AUTO_DB_PASSWORD` from Secret Manager
+- optionally sets a dedicated Cloud Run service account
+
 ## Web Platform Slice
 
 The repo now also includes the first internal-first web platform slice:
@@ -176,6 +210,57 @@ Current scope of this slice:
 - price the uploaded BOQ through the existing pricing engine
 - persist job metadata, file metadata, and pricing run metadata
 - return the latest pricing results through the job API
+- expose a minimal Next.js dashboard, new-job form, and job detail workspace that call the API directly
+
+Database runtime configuration for the web platform/API:
+
+- `BOQ_AUTO_DATABASE_URL`
+  Preferred when you want to pass a full SQLAlchemy database URL directly.
+- `BOQ_AUTO_CLOUD_SQL_CONNECTION_NAME`
+  Used with Cloud SQL Unix sockets on Cloud Run.
+- `BOQ_AUTO_DB_NAME`
+- `BOQ_AUTO_DB_USER`
+- `BOQ_AUTO_DB_PASSWORD` or `BOQ_AUTO_DB_PASSWORD_FILE`
+
+The API now resolves database settings in this order:
+
+1. explicit `BOQ_AUTO_DATABASE_URL`
+2. assembled Cloud SQL/PostgreSQL URL from `BOQ_AUTO_CLOUD_SQL_CONNECTION_NAME` plus DB credentials
+3. local SQLite fallback `boq_auto_web.db`
+
+Recommended Cloud Run runtime variables for PostgreSQL:
+
+- `BOQ_AUTO_CLOUD_SQL_CONNECTION_NAME`
+- `BOQ_AUTO_DB_NAME`
+- `BOQ_AUTO_DB_USER`
+- `BOQ_AUTO_DB_PASSWORD` via Secret Manager mount
+
+When the API is running on Cloud Run with Cloud SQL attached, SQLAlchemy connects over the `/cloudsql/<connection-name>` Unix socket path.
+
+Run the web platform slice locally:
+
+1. Start the FastAPI backend:
+
+```powershell
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+```
+
+2. In a second terminal, start the Next.js app:
+
+```powershell
+cd web
+npm install
+$env:BOQ_AUTO_API_BASE_URL="http://127.0.0.1:8080"
+npm run dev
+```
+
+The current Phase 1 browser flow supports:
+
+- viewing recent jobs on the dashboard
+- creating a new job
+- uploading a BOQ workbook against that job
+- triggering pricing from the job workspace
+- reviewing the latest pricing summary and first line-level results in the browser
 
 ## Windows Packaging
 

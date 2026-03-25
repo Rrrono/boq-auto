@@ -1,3 +1,7 @@
+import Link from "next/link";
+
+import { listJobs } from "../lib/platform-api";
+
 const cards = [
   {
     title: "Price a BOQ",
@@ -13,7 +17,9 @@ const cards = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const jobs = await listJobs().catch(() => []);
+
   return (
     <div className="stack">
       <section className="hero">
@@ -32,6 +38,45 @@ export default function HomePage() {
             <p>{card.text}</p>
           </article>
         ))}
+      </section>
+      <section className="card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <div>
+            <span className="pill">Live Jobs</span>
+            <h3>Recent workspaces</h3>
+          </div>
+          <Link className="buttonLink" href="/jobs/new">
+            Create Job
+          </Link>
+        </div>
+        {jobs.length === 0 ? (
+          <div className="emptyState">No jobs yet. Create the first workspace and upload a BOQ to start pricing.</div>
+        ) : (
+          <div className="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Region</th>
+                  <th>Status</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <tr key={job.id}>
+                    <td>
+                      <Link href={`/jobs/${job.id}`}>{job.title}</Link>
+                    </td>
+                    <td>{job.region}</td>
+                    <td>{job.status}</td>
+                    <td>{new Date(job.updated_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );

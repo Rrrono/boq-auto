@@ -1,3 +1,21 @@
+import { redirect } from "next/navigation";
+
+import { createJob } from "../../../lib/platform-api";
+
+
+async function createJobAction(formData: FormData) {
+  "use server";
+
+  const title = String(formData.get("title") || "").trim();
+  const region = String(formData.get("region") || "").trim();
+  if (!title || !region) {
+    return;
+  }
+  const job = await createJob({ title, region });
+  redirect(`/jobs/${job.id}`);
+}
+
+
 export default function NewJobPage() {
   return (
     <div className="stack">
@@ -10,8 +28,24 @@ export default function NewJobPage() {
         </p>
       </section>
       <section className="card">
-        <h3>Planned fields</h3>
-        <p>Project title, region, client, trade scope, and initial file uploads.</p>
+        <h3>Create the workspace</h3>
+        <form className="form" action={createJobAction}>
+          <label>
+            Job title
+            <input name="title" placeholder="KAA terminal refurbishment pricing" required />
+          </label>
+          <label>
+            Region
+            <select name="region" defaultValue="Nairobi">
+              <option value="Nairobi">Nairobi</option>
+              <option value="Mombasa">Mombasa</option>
+              <option value="Kisumu">Kisumu</option>
+              <option value="Eldoret">Eldoret</option>
+              <option value="Nyeri">Nyeri</option>
+            </select>
+          </label>
+          <button type="submit">Create Job</button>
+        </form>
       </section>
     </div>
   );

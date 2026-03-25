@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+
+def utc_now() -> datetime:
+    """Return a timezone-aware UTC timestamp for ORM defaults."""
+    return datetime.now(timezone.utc)
 
 
 class Job(Base):
@@ -17,8 +22,8 @@ class Job(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     region: Mapped[str] = mapped_column(String(128), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="created", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     files: Mapped[list["JobFile"]] = relationship(back_populates="job", cascade="all, delete-orphan")
     runs: Mapped[list["JobRun"]] = relationship(back_populates="job", cascade="all, delete-orphan")
@@ -33,7 +38,7 @@ class JobFile(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_uri: Mapped[str] = mapped_column(Text, nullable=False)
     content_type: Mapped[str] = mapped_column(String(128), default="", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     job: Mapped[Job] = relationship(back_populates="files")
 
@@ -53,6 +58,6 @@ class JobRun(Base):
     output_storage_uri: Mapped[str] = mapped_column(Text, default="", nullable=False)
     audit_storage_uri: Mapped[str] = mapped_column(Text, default="", nullable=False)
     result_payload: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     job: Mapped[Job] = relationship(back_populates="runs")
