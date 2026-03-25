@@ -1,40 +1,24 @@
 import "./globals.css";
-import Link from "next/link";
-import type { Route } from "next";
 import type { ReactNode } from "react";
+
+import { AppShell } from "../components/app-shell";
+import { AuthProvider } from "../components/auth-provider";
+import { getFirebaseWebConfig } from "../lib/firebase-config";
 
 export const metadata = {
   title: "BOQ AUTO Web",
   description: "Kenyan construction estimating and price intelligence platform.",
 };
 
-const navItems: Array<{ href: Route; label: string }> = [
-  { href: "/", label: "Dashboard" },
-  { href: "/jobs/new", label: "New Job" },
-  { href: "/price-checker", label: "Price Checker" },
-  { href: "/knowledge-review", label: "Knowledge Review" },
-];
-
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const firebaseConfig = getFirebaseWebConfig();
+
   return (
     <html lang="en">
       <body>
-        <div className="shell">
-          <aside className="sidebar">
-            <h1 className="brand">BOQ AUTO</h1>
-            <p className="tagline">
-              Kenyan BOQ automation, tender extraction, and regional price intelligence in one workspace.
-            </p>
-            <nav className="nav">
-              {navItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </aside>
-          <main className="main">{children}</main>
-        </div>
+        <AuthProvider firebaseConfig={firebaseConfig}>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

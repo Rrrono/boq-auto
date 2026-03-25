@@ -37,6 +37,9 @@ a {
   border-right: 1px solid var(--line);
   padding: 24px;
   background: rgba(255, 253, 248, 0.88);
+  display: grid;
+  align-content: start;
+  gap: 18px;
 }
 
 .brand {
@@ -65,6 +68,13 @@ a {
 
 .main {
   padding: 32px;
+}
+
+.authPanel {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .hero {
@@ -170,6 +180,20 @@ a {
   width: fit-content;
 }
 
+.secondaryButton {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  width: fit-content;
+}
+
 .form button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -243,6 +267,21 @@ th {
   font-family: "Courier New", Courier, monospace;
   font-size: 0.85rem;
   word-break: break-word;
+}
+
+.centeredPanel {
+  min-height: calc(100vh - 64px);
+  display: grid;
+  place-items: center;
+}
+
+.authCard {
+  width: min(640px, 100%);
+}
+
+.errorText {
+  margin: 0;
+  color: #9c2f2f;
 }
 
 @media (max-width: 920px) {

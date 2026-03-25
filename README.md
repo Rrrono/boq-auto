@@ -265,6 +265,7 @@ The current Phase 1 browser flow supports:
 - reviewing the latest pricing summary and first line-level results in the browser
 - reviewing recent price observations through the price checker
 - surfacing flagged and unmatched rows through the knowledge review queue
+- signing into the hosted frontend with Firebase Auth groundwork enabled
 
 Deploy the frontend with Firebase App Hosting:
 
