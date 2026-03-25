@@ -1,5 +1,6 @@
 import "./globals.css";
 import Link from "next/link";
+import type { Route } from "next";
 import type { ReactNode } from "react";
 
 export const metadata = {
@@ -7,7 +8,7 @@ export const metadata = {
   description: "Kenyan construction estimating and price intelligence platform.",
 };
 
-const navItems = [
+const navItems: Array<{ href: Route; label: string }> = [
   { href: "/", label: "Dashboard" },
   { href: "/jobs/new", label: "New Job" },
   { href: "/price-checker", label: "Price Checker" },
