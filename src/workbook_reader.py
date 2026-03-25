@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 from collections import Counter
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
+from .excel_loader import load_workbook_safe
 from .models import BOQLine, ColumnMap, SheetData
 from .normalizer import normalize_text
 from .utils import safe_float
@@ -49,7 +50,7 @@ class WorkbookReader:
 
     def read(self, workbook_path: str, column_overrides: dict[str, int] | None = None) -> list[SheetData]:
         """Read a BOQ workbook into structured sheet data."""
-        workbook = load_workbook(workbook_path)
+        workbook = load_workbook_safe(workbook_path)
         return self.read_workbook(workbook, column_overrides)
 
     def read_workbook(self, workbook: Workbook, column_overrides: dict[str, int] | None = None) -> list[SheetData]:

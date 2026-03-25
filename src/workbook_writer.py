@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, Font, Side
 from openpyxl.utils import get_column_letter
 
+from .excel_loader import load_workbook_safe
 from .models import CommercialTerms, MatchResult, QuotationSummary, SheetData, TextListEntry
 from .utils import ensure_parent
 
@@ -188,7 +188,7 @@ class WorkbookWriter:
     ) -> Path:
         """Write rates and suggestions into a copied workbook."""
         ensure_parent(Path(output_workbook))
-        workbook = load_workbook(source_workbook)
+        workbook = load_workbook_safe(source_workbook)
         result_map = {(result.boq_line.sheet_name, result.boq_line.row_number): result for result in results}
 
         self._apply_pricing_to_boq(workbook, sheets, result_map, apply_rates, write_amount_formulas)

@@ -6,10 +6,10 @@ import logging
 from io import BytesIO
 
 import pandas as pd
-from openpyxl import load_workbook
 
 from app.models.boq import ParsedBoqItem
 from src.config_loader import load_config
+from src.excel_loader import load_workbook_safe
 from src.section_inference import infer_section
 from src.workbook_reader import WorkbookReader
 
@@ -27,7 +27,7 @@ def parse_boq_file(file_bytes: bytes, filename: str) -> list[ParsedBoqItem]:
         raise InvalidWorkbookError("Uploaded workbook is empty.")
 
     try:
-        workbook = load_workbook(BytesIO(file_bytes))
+        workbook = load_workbook_safe(BytesIO(file_bytes))
     except Exception as exc:  # pragma: no cover - workbook parser boundary
         raise InvalidWorkbookError(f"Could not read Excel workbook '{filename}'.") from exc
 

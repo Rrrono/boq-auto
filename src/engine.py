@@ -5,13 +5,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from openpyxl import load_workbook
-
 from .ai.embedding_provider import get_embedding_provider
 from .audit import export_unmatched_csv, write_audit_json
 from .buildup import price_build_up_recipe
 from .commercial import resolve_commercial_terms, resolve_regional_factor, summarize_quote
 from .cost_schema import CostDatabase, schema_database_path
+from .excel_loader import load_workbook_safe
 from .learning_engine import LearningEngine
 from .matching_engine import MatchingEngine
 from .matcher import Matcher, MatchingWeights
@@ -57,7 +56,7 @@ class PricingEngine:
 
     def load_database(self, path: str) -> DatabaseBundle:
         """Load the Excel database workbook into in-memory models."""
-        workbook = load_workbook(path, data_only=True)
+        workbook = load_workbook_safe(path, data_only=True)
         missing = REQUIRED_SHEETS - set(workbook.sheetnames)
         if missing:
             raise ValueError(f"Database is missing required sheets: {', '.join(sorted(missing))}")
@@ -250,7 +249,7 @@ class PricingEngine:
 
     def validate_database(self, db_path: str) -> list[str]:
         """Validate workbook sheets and minimum required columns."""
-        workbook = load_workbook(db_path, data_only=True)
+        workbook = load_workbook_safe(db_path, data_only=True)
         errors: list[str] = []
         missing = REQUIRED_SHEETS - set(workbook.sheetnames)
         if missing:
