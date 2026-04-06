@@ -52,7 +52,12 @@ export type PricingResult = {
     decision: string;
     matched_description: string;
     confidence_score: number;
+    confidence_band: string;
     review_flag: boolean;
+    flag_reasons: string[];
+    generic_match_flag: boolean;
+    category_mismatch_flag: boolean;
+    section_mismatch_flag: boolean;
   }>;
 };
 
@@ -69,6 +74,11 @@ export type PriceObservation = {
   amount: number | null;
   decision: string;
   confidence_score: number;
+  confidence_band: string;
+  flag_reasons: string[];
+  generic_match_flag: boolean;
+  category_mismatch_flag: boolean;
+  section_mismatch_flag: boolean;
 };
 
 export type PriceCheckResponse = {
@@ -88,7 +98,12 @@ export type KnowledgeCandidate = {
   matched_description: string;
   decision: string;
   confidence_score: number;
+  confidence_band: string;
   review_flag: boolean;
+  flag_reasons: string[];
+  generic_match_flag: boolean;
+  category_mismatch_flag: boolean;
+  section_mismatch_flag: boolean;
 };
 
 export type KnowledgeQueueResponse = {

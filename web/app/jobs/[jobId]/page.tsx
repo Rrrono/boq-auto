@@ -15,6 +15,14 @@ import {
   uploadJobFile,
 } from "../../../lib/platform-api";
 
+function formatReason(reason: string) {
+  return reason.replaceAll("_", " ");
+}
+
+function decisionClass(decision: string) {
+  return `decisionBadge decision-${decision || "review"}`;
+}
+
 export default function JobDetailPage() {
   const params = useParams<{ jobId: string }>();
   const jobId = params.jobId;
@@ -82,6 +90,18 @@ export default function JobDetailPage() {
     }
     return Math.round((pricing.summary.flagged_count / pricing.summary.item_count) * 100);
   }, [pricing]);
+  const reviewMessage = useMemo(() => {
+    if (!pricing || flaggedPercent === null) {
+      return "";
+    }
+    if (flaggedPercent >= 40) {
+      return "This run completed, but it is review-heavy. Treat the current output as triage-first and check the flagged reasons before trusting rates.";
+    }
+    if (flaggedPercent >= 20) {
+      return "This run produced a noticeable review queue. Low-confidence rows now carry reason badges so the team can inspect why they were held back.";
+    }
+    return "";
+  }, [flaggedPercent, pricing]);
 
   async function reloadWorkspace(nextNotice?: string) {
     if (!jobId) {
@@ -219,6 +239,13 @@ export default function JobDetailPage() {
         </section>
       ) : null}
 
+      {reviewMessage ? (
+        <section className="alertCard">
+          <strong>Review-first signal</strong>
+          <p>{reviewMessage}</p>
+        </section>
+      ) : null}
+
       <section className="metaGrid">
         <div className="metaRow">
           <strong>Status</strong>
@@ -342,6 +369,11 @@ export default function JobDetailPage() {
         <h3>Latest pricing summary</h3>
         {pricing ? (
           <>
+            <div className="triageLegend">
+              <div className="triageLegendItem">`matched` means the row cleared pricing thresholds.</div>
+              <div className="triageLegendItem">`review` means the engine found a candidate but wants QS attention.</div>
+              <div className="triageLegendItem">`unmatched` means price manually or improve the library first.</div>
+            </div>
             <div className="metaGrid">
               <div className="metaRow">
                 <strong>Total cost</strong>
@@ -380,19 +412,35 @@ export default function JobDetailPage() {
                     <th>Match</th>
                     <th>Rate</th>
                     <th>Amount</th>
-                    <th>Confidence</th>
+                    <th>Triage</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pricing.items.slice(0, 20).map((item, index) => (
-                    <tr key={`${item.description}-${index}`}>
+                    <tr key={`${item.description}-${index}`} className="rowMuted">
                       <td>{item.description}</td>
                       <td>{item.unit || "-"}</td>
-                      <td>{item.decision}</td>
+                      <td>
+                        <span className={decisionClass(item.decision)}>{item.decision}</span>
+                      </td>
                       <td>{item.matched_description || "-"}</td>
                       <td>{item.rate ?? "-"}</td>
                       <td>{item.amount ?? "-"}</td>
-                      <td>{item.confidence_score.toFixed(2)}</td>
+                      <td className="triageCell">
+                        <div className="triageStack">
+                          <span className={`confidenceBadge confidence-${item.confidence_band}`}>{item.confidence_band}</span>
+                          <div className="triageScore">Score {item.confidence_score.toFixed(2)}</div>
+                        </div>
+                        {item.flag_reasons.length > 0 ? (
+                          <div className="reasonList">
+                            {item.flag_reasons.map((reason) => (
+                              <span key={reason} className="reasonBadge">
+                                {formatReason(reason)}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

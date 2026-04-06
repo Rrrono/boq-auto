@@ -21,7 +21,12 @@ class ParsedBoqItem(BaseModel):
     matched_item_code: str = ""
     matched_description: str = ""
     confidence_score: float = 0.0
+    confidence_band: str = "very_low"
     review_flag: bool = False
+    flag_reasons: list[str] = Field(default_factory=list)
+    generic_match_flag: bool = False
+    category_mismatch_flag: bool = False
+    section_mismatch_flag: bool = False
     basis_of_rate: str = ""
 
 

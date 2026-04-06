@@ -157,6 +157,11 @@ class MatchResult:
     built_up: bool = False
     basis_of_rate: str = ""
     approval_status: str = "Pending Pricing Review"
+    confidence_band: str = "very_low"
+    flag_reasons: list[str] = field(default_factory=list)
+    generic_match_flag: bool = False
+    category_mismatch_flag: bool = False
+    section_mismatch_flag: bool = False
     commercial_review_flags: list[str] = field(default_factory=list)
     alternate_options: list[str] = field(default_factory=list)
     regional_factor: float = 1.0

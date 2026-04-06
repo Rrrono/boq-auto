@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import fabs
+import re
 
 from rapidfuzz import fuzz
 
@@ -43,12 +44,43 @@ class Matcher:
         self.matching_mode = matching_mode
         self.matching_engine = matching_engine
 
+    CATEGORY_HINTS: dict[str, tuple[str, ...]] = {
+        "earthworks": ("excavat", "trench", "backfill", "fill", "cart away", "earthwork", "soil", "hardcore"),
+        "concrete": ("concrete", "blinding", "reinforced", "formwork", "rebar", "vibrator", "strip footing"),
+        "masonry": ("blockwork", "stone wall", "masonry", "brickwork", "walling", "mortar"),
+        "electrical": ("light", "lighting", "socket", "cable", "switch", "distribution board", "electrical", "conduit"),
+        "plumbing": ("pipe", "drain", "sewer", "manhole", "water supply", "sanitary", "plumbing"),
+        "finishes": ("paint", "plaster", "screed", "tile", "ceiling", "finish", "render"),
+        "survey": ("survey", "setting out", "beacon", "leveling", "chainage", "theodolite", "total station"),
+        "lab_testing": ("test", "testing", "laboratory", "lab", "cube", "soil test", "material test"),
+        "furniture_accommodation": ("furniture", "bed", "mattress", "wardrobe", "sofa", "chair", "table", "housing", "accommodation"),
+        "electrical_support": ("generator", "transformer", "pole", "earthing", "lightning", "cctv", "fire alarm", "solar"),
+        "dayworks": ("daywork", "hire", "plant", "excavator", "tipper", "truck", "roller", "grader"),
+    }
+    GENERIC_TERMS: tuple[str, ...] = (
+        "general",
+        "general item",
+        "preliminary",
+        "preliminaries",
+        "provisional",
+        "provisional sum",
+        "contingency",
+        "sundries",
+        "miscellaneous",
+        "other item",
+        "concrete work",
+        "electrical works",
+        "plumbing works",
+        "dayworks",
+    )
+
     def match(self, line: BOQLine, region: str) -> MatchResult:
         """Return the best matching rate item for a BOQ line."""
         normalized_query, alias_hits = apply_aliases(line.description, self.aliases)
         line.normalized_description = normalized_query
         normalized_attributes = normalize_text(getattr(line, "spec_attributes", "") or "")
         attribute_terms = {token for token in normalized_attributes.split() if len(token) > 2}
+        query_category = self._infer_category(normalized_query, line.inferred_section)
         alias_section_match = any(
             entry.section_bias and line.inferred_section and entry.section_bias.lower() == line.inferred_section.lower()
             for entry in alias_hits
@@ -75,12 +107,18 @@ class Matcher:
             score = (description_score * 0.45) + (partial_score * 0.20) + (token_set_score * 0.35)
             rationale = [f"text={score:.1f}", f"sort={description_score:.1f}", f"set={token_set_score:.1f}"]
             review_flags: list[str] = []
+            item_category = self._infer_category(item.normalized_description, item.section)
+            generic_match_flag = self._generic_match_flag(normalized_query, item)
+            category_mismatch_flag = False
+            section_mismatch_flag = False
 
             if line.inferred_section and item.section and line.inferred_section.lower() == item.section.lower():
                 score += self.weights.section_bonus
                 rationale.append("section-bonus")
             elif line.inferred_section and item.section:
+                score -= self.weights.section_bonus * 1.15
                 review_flags.append("section mismatch")
+                section_mismatch_flag = True
 
             if region and item.region and region.lower() == item.region.lower():
                 score += self.weights.region_bonus
@@ -112,6 +150,15 @@ class Matcher:
                     score += attribute_score * self.weights.attribute_bonus
                     rationale.append(f"attribute={attribute_score:.2f}")
 
+            if query_category and item_category and query_category != item_category:
+                category_mismatch_flag = True
+                score -= max(self.weights.alias_bonus + 3.0, self.weights.section_bonus * 0.9)
+                review_flags.append(f"category mismatch: boq={query_category} library={item_category}")
+
+            if generic_match_flag:
+                score -= max(6.0, self.weights.alias_bonus + 1.0)
+                review_flags.append("generic candidate match")
+
             external_score, external_rationale = external_scores.get(item.item_code, (0.0, []))
             if effective_mode == "ai":
                 if not external_score:
@@ -132,23 +179,30 @@ class Matcher:
                 review_flags.append("unstable text score")
             if review_flags:
                 rationale.extend(review_flags)
-            ranked.append((score, item, rationale))
+            ranked.append((score, item, rationale, generic_match_flag, category_mismatch_flag, section_mismatch_flag))
 
         ranked.sort(key=lambda entry: entry[0], reverse=True)
         if not ranked:
             return MatchResult(boq_line=line, decision="unmatched", review_flag=True, rationale=["no-active-items"])
 
-        best_score, best_item, best_rationale = ranked[0]
+        best_score, best_item, best_rationale, generic_match_flag, category_mismatch_flag, section_mismatch_flag = ranked[0]
         alternate_options = [
             f"{item.item_code} | {item.description} | {item.unit} | {item.rate:.2f} | {score:.1f}"
-            for score, item, _ in ranked[1:4]
+            for score, item, _, _, _, _ in ranked[1:4]
             if score >= self.weights.review_threshold
         ]
 
+        confidence_band = self._confidence_band(best_score)
         decision = "matched" if best_score >= self.weights.threshold else "review"
         unit_mismatch_forced_review = any(note.startswith("unit mismatch:") for note in best_rationale)
-        review_flag = (best_score < self.weights.strong_threshold) or unit_mismatch_forced_review
-        commercial_review_flags = [note for note in best_rationale if "mismatch" in note or "missing" in note or "unstable" in note]
+        suspicious_match = generic_match_flag or category_mismatch_flag or section_mismatch_flag
+        if suspicious_match and best_score < self.weights.strong_threshold:
+            decision = "review"
+        if best_score < self.weights.review_threshold:
+            decision = "unmatched"
+        flag_reasons = self._flag_reasons(best_rationale, confidence_band)
+        review_flag = (best_score < self.weights.strong_threshold) or unit_mismatch_forced_review or decision != "matched"
+        commercial_review_flags = [note for note in best_rationale if "mismatch" in note or "missing" in note or "unstable" in note or "generic" in note]
         return MatchResult(
             boq_line=line,
             decision=decision,
@@ -164,9 +218,73 @@ class Matcher:
             region_used=best_item.region or region,
             basis_of_rate=best_item.basis,
             alternate_options=alternate_options,
+            confidence_band=confidence_band,
+            flag_reasons=flag_reasons,
+            generic_match_flag=generic_match_flag,
+            category_mismatch_flag=category_mismatch_flag,
+            section_mismatch_flag=section_mismatch_flag,
             commercial_review_flags=commercial_review_flags,
             rationale=best_rationale,
         )
+
+    def _infer_category(self, text: str, section: str = "") -> str:
+        haystack = normalize_text(" ".join(part for part in [text, section] if part))
+        if not haystack:
+            return ""
+        normalized_section = normalize_text(section)
+        for category, terms in self.CATEGORY_HINTS.items():
+            if normalized_section and category in normalized_section:
+                return category
+            if any(term in haystack for term in terms):
+                return category
+        return ""
+
+    def _generic_match_flag(self, normalized_query: str, item: RateItem) -> bool:
+        item_text = normalize_text(" ".join(part for part in [item.description, item.section, item.notes] if part))
+        if not item_text:
+            return False
+        item_generic = any(term in item_text for term in self.GENERIC_TERMS)
+        query_generic = any(term in normalized_query for term in self.GENERIC_TERMS)
+        if not item_generic or query_generic:
+            return False
+        query_tokens = {token for token in re.split(r"\s+", normalized_query) if len(token) > 2}
+        item_tokens = {token for token in re.split(r"\s+", item_text) if len(token) > 2}
+        meaningful_overlap = query_tokens & item_tokens
+        return len(meaningful_overlap) <= 2
+
+    def _confidence_band(self, score: float) -> str:
+        if score >= self.weights.strong_threshold:
+            return "high"
+        if score >= self.weights.threshold:
+            return "medium"
+        if score >= self.weights.review_threshold:
+            return "low"
+        return "very_low"
+
+    @staticmethod
+    def _flag_reasons(rationale: list[str], confidence_band: str) -> list[str]:
+        reasons: list[str] = []
+        for note in rationale:
+            lowered = note.lower()
+            if "unit mismatch" in lowered:
+                reasons.append("unit_mismatch")
+            elif "category mismatch" in lowered:
+                reasons.append("category_mismatch")
+            elif "section mismatch" in lowered:
+                reasons.append("section_mismatch")
+            elif "generic candidate match" in lowered:
+                reasons.append("generic_match")
+            elif "missing boq unit" in lowered:
+                reasons.append("missing_unit")
+            elif "unstable text score" in lowered:
+                reasons.append("unstable_text_score")
+        if confidence_band in {"low", "very_low"}:
+            reasons.append(f"confidence_{confidence_band}")
+        deduped: list[str] = []
+        for reason in reasons:
+            if reason not in deduped:
+                deduped.append(reason)
+        return deduped
 
     @staticmethod
     def _attribute_overlap(attribute_terms: set[str], item: RateItem) -> float:

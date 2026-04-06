@@ -89,6 +89,12 @@ def test_price_check_and_knowledge_queue() -> None:
     assert price_check["scanned_jobs"] == 1
     assert price_check["filtered_rows"] >= 1
     assert any("concrete" in item["description"].lower() or "concrete" in item["matched_description"].lower() for item in price_check["observations"])
+    first_observation = price_check["observations"][0]
+    assert "confidence_band" in first_observation
+    assert "flag_reasons" in first_observation
+    assert "generic_match_flag" in first_observation
+    assert "category_mismatch_flag" in first_observation
+    assert "section_mismatch_flag" in first_observation
 
     knowledge_response = client.get("/knowledge/candidates")
     assert knowledge_response.status_code == 200
@@ -96,3 +102,10 @@ def test_price_check_and_knowledge_queue() -> None:
     assert queue["scanned_jobs"] == 1
     assert queue["candidate_count"] >= 0
     assert "candidates" in queue
+    if queue["candidates"]:
+        first_candidate = queue["candidates"][0]
+        assert "confidence_band" in first_candidate
+        assert "flag_reasons" in first_candidate
+        assert "generic_match_flag" in first_candidate
+        assert "category_mismatch_flag" in first_candidate
+        assert "section_mismatch_flag" in first_candidate

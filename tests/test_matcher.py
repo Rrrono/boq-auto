@@ -60,3 +60,43 @@ def test_matcher_uses_spec_attributes_as_extra_signal() -> None:
 
     assert result.matched_item_code == "A"
     assert any("attribute=" in note for note in result.rationale)
+
+
+def test_matcher_downgrades_generic_candidate_matches() -> None:
+    items = [
+        RateItem("A", "General electrical works", "general electrical works", "Electrical", "", "sum", 250000, "KES", "Nairobi", "src", "", "", "", "", "", "", "", "", "", 0, "", True),
+    ]
+    matcher = Matcher(items, [], MatchingWeights(78, 65, 88, 4, 8, 6, 5, 18, 6))
+    line = BOQLine(
+        sheet_name="Electrical",
+        row_number=7,
+        description="Electrical light fittings installation",
+        unit="sum",
+        inferred_section="Electrical",
+    )
+
+    result = matcher.match(line, "Nairobi")
+
+    assert result.generic_match_flag is True
+    assert "generic_match" in result.flag_reasons
+    assert result.decision in {"review", "unmatched"}
+
+
+def test_matcher_flags_category_mismatch_for_text_similar_weak_cluster() -> None:
+    items = [
+        RateItem("A", "Concrete testing and commissioning", "concrete testing and commissioning", "Concrete", "", "item", 18000, "KES", "Nairobi", "src", "", "", "", "", "", "", "test, concrete", "", "", 0, "", True),
+    ]
+    matcher = Matcher(items, [], MatchingWeights(78, 65, 88, 4, 8, 6, 5, 18, 6))
+    line = BOQLine(
+        sheet_name="Electrical",
+        row_number=10,
+        description="Electrical testing and commissioning",
+        unit="item",
+        inferred_section="Electrical",
+    )
+
+    result = matcher.match(line, "Nairobi")
+
+    assert result.category_mismatch_flag is True
+    assert "category_mismatch" in result.flag_reasons
+    assert result.decision in {"review", "unmatched"}

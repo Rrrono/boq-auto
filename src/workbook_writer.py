@@ -247,9 +247,9 @@ class WorkbookWriter:
             [
                 "sheet_name", "row_number", "boq_description", "boq_unit", "boq_quantity", "decision",
                 "matched_item_code", "matched_description", "matched_unit", "base_rate", "rate",
-                "confidence_score", "review_flag", "section_used", "source", "region_used", "built_up",
-                "basis_of_rate", "approval_status", "commercial_review_flags", "regional_factor",
-                "alternate_options", "rationale",
+                "confidence_score", "confidence_band", "review_flag", "section_used", "source", "region_used", "built_up",
+                "basis_of_rate", "approval_status", "flag_reasons", "generic_match_flag", "category_mismatch_flag",
+                "section_mismatch_flag", "commercial_review_flags", "regional_factor", "alternate_options", "rationale",
             ]
         )
         for result in results:
@@ -258,10 +258,12 @@ class WorkbookWriter:
                 [
                     line.sheet_name, line.row_number, line.description, line.unit, line.quantity, result.decision,
                     result.matched_item_code, result.matched_description, result.matched_unit, result.base_rate,
-                    result.rate, result.confidence_score, "YES" if result.review_flag else "NO", result.section_used,
-                    result.source, result.region_used, "YES" if result.built_up else "NO", result.basis_of_rate,
-                    result.approval_status, "; ".join(result.commercial_review_flags), result.regional_factor,
-                    " || ".join(result.alternate_options), "; ".join(result.rationale),
+                    result.rate, result.confidence_score, result.confidence_band, "YES" if result.review_flag else "NO",
+                    result.section_used, result.source, result.region_used, "YES" if result.built_up else "NO",
+                    result.basis_of_rate, result.approval_status, "; ".join(result.flag_reasons),
+                    "YES" if result.generic_match_flag else "NO", "YES" if result.category_mismatch_flag else "NO",
+                    "YES" if result.section_mismatch_flag else "NO", "; ".join(result.commercial_review_flags),
+                    result.regional_factor, " || ".join(result.alternate_options), "; ".join(result.rationale),
                 ]
             )
 
@@ -321,7 +323,7 @@ class WorkbookWriter:
         review_sheet.append(
             [
                 "sheet_name", "row_number", "boq_description", "decision", "approval_status",
-                "commercial_review_flags", "alternate_options",
+                "confidence_band", "flag_reasons", "commercial_review_flags", "alternate_options",
             ]
         )
         for result in results:
@@ -330,8 +332,8 @@ class WorkbookWriter:
             review_sheet.append(
                 [
                     result.boq_line.sheet_name, result.boq_line.row_number, result.boq_line.description,
-                    result.decision, result.approval_status, "; ".join(result.commercial_review_flags),
-                    " || ".join(result.alternate_options),
+                    result.decision, result.approval_status, result.confidence_band, "; ".join(result.flag_reasons),
+                    "; ".join(result.commercial_review_flags), " || ".join(result.alternate_options),
                 ]
             )
 

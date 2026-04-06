@@ -5,6 +5,14 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../components/auth-provider";
 import { getErrorMessage, getKnowledgeQueue, type KnowledgeQueueResponse } from "../../lib/platform-api";
 
+function formatReason(reason: string) {
+  return reason.replaceAll("_", " ");
+}
+
+function decisionClass(decision: string) {
+  return `decisionBadge decision-${decision || "review"}`;
+}
+
 const emptyQueue: KnowledgeQueueResponse = {
   scanned_jobs: 0,
   candidate_count: 0,
@@ -93,6 +101,11 @@ export default function KnowledgeReviewPage() {
       <section className="card">
         <span className="pill">Live Queue</span>
         <h3>Flagged rows from recent jobs</h3>
+        <div className="triageLegend">
+          <div className="triageLegendItem">`high` means the row priced cleanly.</div>
+          <div className="triageLegendItem">`medium` means usable but worth checking.</div>
+          <div className="triageLegendItem">`low` and `very low` are triage-first rows.</div>
+        </div>
         {loadingQueue ? (
           <div className="emptyState">Loading recent review candidates...</div>
         ) : queue.candidates.length === 0 ? (
@@ -110,18 +123,34 @@ export default function KnowledgeReviewPage() {
                   <th>Description</th>
                   <th>Current match</th>
                   <th>Decision</th>
-                  <th>Confidence</th>
+                  <th>Triage</th>
                 </tr>
               </thead>
               <tbody>
                 {queue.candidates.map((item, index) => (
-                  <tr key={`${item.job_title}-${item.description}-${index}`}>
+                  <tr key={`${item.job_title}-${item.description}-${index}`} className="rowMuted">
                     <td>{item.job_title}</td>
                     <td>{item.region}</td>
                     <td>{item.description}</td>
                     <td>{item.matched_description || "-"}</td>
-                    <td>{item.decision}</td>
-                    <td>{item.confidence_score.toFixed(2)}</td>
+                    <td>
+                      <span className={decisionClass(item.decision)}>{item.decision}</span>
+                    </td>
+                    <td className="triageCell">
+                      <div className="triageStack">
+                        <span className={`confidenceBadge confidence-${item.confidence_band}`}>{item.confidence_band}</span>
+                        <div className="triageScore">Score {item.confidence_score.toFixed(2)}</div>
+                      </div>
+                      {item.flag_reasons.length > 0 ? (
+                        <div className="reasonList">
+                          {item.flag_reasons.map((reason) => (
+                            <span key={reason} className="reasonBadge">
+                              {formatReason(reason)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>

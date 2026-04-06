@@ -259,6 +259,108 @@ th {
   color: var(--accent);
 }
 
+.confidenceBadge,
+.reasonBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  margin: 0 6px 6px 0;
+}
+
+.confidence-high {
+  background: #edf7ef;
+  color: #29573b;
+  border-color: #b8d6bd;
+}
+
+.confidence-medium {
+  background: #eef4fb;
+  color: #2b547c;
+  border-color: #bfd0e3;
+}
+
+.confidence-low,
+.confidence-very_low {
+  background: #fff4e5;
+  color: #8b5f17;
+  border-color: #e6c994;
+}
+
+.reasonList {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.decisionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.decision-matched {
+  background: #edf7ef;
+  color: #29573b;
+  border-color: #b8d6bd;
+}
+
+.decision-review {
+  background: #fff4e5;
+  color: #8b5f17;
+  border-color: #e6c994;
+}
+
+.decision-unmatched {
+  background: #fff0ec;
+  color: #8f3225;
+  border-color: #e1b1a6;
+}
+
+.triageLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 18px;
+}
+
+.triageLegendItem {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.triageCell {
+  min-width: 220px;
+}
+
+.triageScore {
+  color: var(--muted);
+  font-size: 0.86rem;
+  margin-top: 4px;
+}
+
+.triageStack {
+  display: grid;
+  gap: 6px;
+}
+
+.rowMuted {
+  opacity: 0.96;
+}
+
 .helperText {
   color: var(--muted);
   line-height: 1.5;

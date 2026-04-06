@@ -16,6 +16,11 @@ class PriceObservationResponse(BaseModel):
     amount: float | None = None
     decision: str = ""
     confidence_score: float = 0.0
+    confidence_band: str = "very_low"
+    flag_reasons: list[str] = Field(default_factory=list)
+    generic_match_flag: bool = False
+    category_mismatch_flag: bool = False
+    section_mismatch_flag: bool = False
 
 
 class PriceCheckResponse(BaseModel):
@@ -35,7 +40,12 @@ class KnowledgeCandidateResponse(BaseModel):
     matched_description: str = ""
     decision: str = ""
     confidence_score: float = 0.0
+    confidence_band: str = "very_low"
     review_flag: bool = False
+    flag_reasons: list[str] = Field(default_factory=list)
+    generic_match_flag: bool = False
+    category_mismatch_flag: bool = False
+    section_mismatch_flag: bool = False
 
 
 class KnowledgeQueueResponse(BaseModel):

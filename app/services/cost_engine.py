@@ -132,7 +132,12 @@ def _load_response_items(audit_json_path: Path | None) -> list[ParsedBoqItem]:
                 matched_item_code=str(row.get("matched_item_code") or ""),
                 matched_description=str(row.get("matched_description") or ""),
                 confidence_score=float(row.get("confidence_score") or 0.0),
+                confidence_band=str(row.get("confidence_band") or "very_low"),
                 review_flag=bool(row.get("review_flag") or False),
+                flag_reasons=[str(value) for value in row.get("flag_reasons", []) if str(value).strip()],
+                generic_match_flag=bool(row.get("generic_match_flag") or False),
+                category_mismatch_flag=bool(row.get("category_mismatch_flag") or False),
+                section_mismatch_flag=bool(row.get("section_mismatch_flag") or False),
                 basis_of_rate=str(row.get("basis_of_rate") or ""),
             )
         )

@@ -36,7 +36,12 @@ def write_audit_json(path: Path, results: list[MatchResult], metadata: dict) -> 
                 "base_rate": item.base_rate,
                 "rate": item.rate,
                 "confidence_score": item.confidence_score,
+                "confidence_band": item.confidence_band,
                 "review_flag": item.review_flag,
+                "flag_reasons": item.flag_reasons,
+                "generic_match_flag": item.generic_match_flag,
+                "category_mismatch_flag": item.category_mismatch_flag,
+                "section_mismatch_flag": item.section_mismatch_flag,
                 "built_up": item.built_up,
                 "basis_of_rate": item.basis_of_rate,
                 "approval_status": item.approval_status,
@@ -67,8 +72,10 @@ def export_unmatched_csv(path: Path, results: list[MatchResult]) -> Path:
                 "matched_item_code",
                 "matched_description",
                 "confidence_score",
+                "confidence_band",
                 "review_flag",
                 "approval_status",
+                "flag_reasons",
                 "commercial_review_flags",
             ]
         )
@@ -85,8 +92,10 @@ def export_unmatched_csv(path: Path, results: list[MatchResult]) -> Path:
                     result.matched_item_code,
                     result.matched_description,
                     result.confidence_score,
+                    result.confidence_band,
                     result.review_flag,
                     result.approval_status,
+                    "; ".join(result.flag_reasons),
                     "; ".join(result.commercial_review_flags),
                 ]
             )

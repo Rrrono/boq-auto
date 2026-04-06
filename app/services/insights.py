@@ -27,6 +27,10 @@ def _latest_result_payload(job: Job) -> dict | None:
     return json.loads(latest_run.result_payload)
 
 
+def _item_flag_reasons(item: dict) -> list[str]:
+    return [str(value) for value in item.get("flag_reasons", []) if str(value).strip()]
+
+
 def search_price_observations(db: Session, query: str = "", *, limit: int = 50) -> PriceCheckResponse:
     normalized_query = query.strip().lower()
     priced_jobs = _recent_priced_jobs(db)
@@ -57,6 +61,11 @@ def search_price_observations(db: Session, query: str = "", *, limit: int = 50) 
                     amount=item.get("amount"),
                     decision=str(item.get("decision", "")),
                     confidence_score=float(item.get("confidence_score", 0.0) or 0.0),
+                    confidence_band=str(item.get("confidence_band", "very_low") or "very_low"),
+                    flag_reasons=_item_flag_reasons(item),
+                    generic_match_flag=bool(item.get("generic_match_flag", False)),
+                    category_mismatch_flag=bool(item.get("category_mismatch_flag", False)),
+                    section_mismatch_flag=bool(item.get("section_mismatch_flag", False)),
                 )
             )
 
@@ -103,7 +112,12 @@ def build_knowledge_queue(db: Session, *, limit: int = 50) -> KnowledgeQueueResp
                     matched_description=str(item.get("matched_description", "")),
                     decision=decision,
                     confidence_score=float(item.get("confidence_score", 0.0) or 0.0),
+                    confidence_band=str(item.get("confidence_band", "very_low") or "very_low"),
                     review_flag=review_flag,
+                    flag_reasons=_item_flag_reasons(item),
+                    generic_match_flag=bool(item.get("generic_match_flag", False)),
+                    category_mismatch_flag=bool(item.get("category_mismatch_flag", False)),
+                    section_mismatch_flag=bool(item.get("section_mismatch_flag", False)),
                 )
             )
 

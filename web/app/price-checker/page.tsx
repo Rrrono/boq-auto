@@ -11,6 +11,14 @@ function normalizeQuery(input: string) {
   return input.trim().toLowerCase();
 }
 
+function formatReason(reason: string) {
+  return reason.replaceAll("_", " ");
+}
+
+function decisionClass(decision: string) {
+  return `decisionBadge decision-${decision || "review"}`;
+}
+
 const emptyResult: PriceCheckResponse = {
   query: "",
   scanned_jobs: 0,
@@ -140,6 +148,11 @@ export default function PriceCheckerPage() {
       <section className="card">
         <span className="pill">Observed Evidence</span>
         <h3>Recent pricing matches</h3>
+        <div className="triageLegend">
+          <div className="triageLegendItem">Use the decision badge for workflow status.</div>
+          <div className="triageLegendItem">Use the confidence band for quick trust level.</div>
+          <div className="triageLegendItem">Use the reason badges to see why a row was held back.</div>
+        </div>
         {loadingResult ? (
           <div className="emptyState">Loading recent pricing evidence...</div>
         ) : result.observations.length === 0 ? (
@@ -159,20 +172,36 @@ export default function PriceCheckerPage() {
                   <th>Decision</th>
                   <th>Unit</th>
                   <th>Rate</th>
-                  <th>Confidence</th>
+                  <th>Triage</th>
                 </tr>
               </thead>
               <tbody>
                 {result.observations.map((item, index) => (
-                  <tr key={`${item.job_title}-${item.description}-${index}`}>
+                  <tr key={`${item.job_title}-${item.description}-${index}`} className="rowMuted">
                     <td>{item.job_title}</td>
                     <td>{item.region}</td>
                     <td>{item.description}</td>
                     <td>{item.matched_description || "-"}</td>
-                    <td>{item.decision}</td>
+                    <td>
+                      <span className={decisionClass(item.decision)}>{item.decision}</span>
+                    </td>
                     <td>{item.unit || "-"}</td>
                     <td>{item.rate.toLocaleString()}</td>
-                    <td>{item.confidence_score.toFixed(2)}</td>
+                    <td className="triageCell">
+                      <div className="triageStack">
+                        <span className={`confidenceBadge confidence-${item.confidence_band}`}>{item.confidence_band}</span>
+                        <div className="triageScore">Score {item.confidence_score.toFixed(2)}</div>
+                      </div>
+                      {item.flag_reasons.length > 0 ? (
+                        <div className="reasonList">
+                          {item.flag_reasons.map((reason) => (
+                            <span key={reason} className="reasonBadge">
+                              {formatReason(reason)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
