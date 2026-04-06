@@ -73,6 +73,21 @@ class Matcher:
         "plumbing works",
         "dayworks",
     )
+    CATEGORY_COMPATIBILITY: dict[str, set[str]] = {
+        "electrical": {"electrical", "electrical_support"},
+        "electrical_support": {"electrical", "electrical_support"},
+        "survey": {"survey"},
+        "lab_testing": {"lab_testing"},
+        "furniture_accommodation": {"furniture_accommodation"},
+        "earthworks": {"earthworks", "dayworks"},
+        "dayworks": {"dayworks", "earthworks"},
+        "concrete": {"concrete"},
+        "masonry": {"masonry", "finishes"},
+        "finishes": {"finishes", "masonry"},
+        "plumbing": {"plumbing"},
+    }
+    SPECIALIST_CATEGORIES: set[str] = {"survey", "lab_testing", "furniture_accommodation", "electrical_support"}
+    GENERIC_CIVIL_CATEGORIES: set[str] = {"earthworks", "concrete", "dayworks"}
 
     def match(self, line: BOQLine, region: str) -> MatchResult:
         """Return the best matching rate item for a BOQ line."""
@@ -80,7 +95,7 @@ class Matcher:
         line.normalized_description = normalized_query
         normalized_attributes = normalize_text(getattr(line, "spec_attributes", "") or "")
         attribute_terms = {token for token in normalized_attributes.split() if len(token) > 2}
-        query_category = self._infer_category(normalized_query, line.inferred_section)
+        query_category = self._infer_category(" ".join(part for part in [normalized_query, normalized_attributes] if part), line.inferred_section)
         alias_section_match = any(
             entry.section_bias and line.inferred_section and entry.section_bias.lower() == line.inferred_section.lower()
             for entry in alias_hits
@@ -150,10 +165,19 @@ class Matcher:
                     score += attribute_score * self.weights.attribute_bonus
                     rationale.append(f"attribute={attribute_score:.2f}")
 
-            if query_category and item_category and query_category != item_category:
+            categories_compatible = self._categories_compatible(query_category, item_category)
+            if query_category and item_category and not categories_compatible:
                 category_mismatch_flag = True
-                score -= max(self.weights.alias_bonus + 3.0, self.weights.section_bonus * 0.9)
+                mismatch_penalty = max(self.weights.alias_bonus + 3.0, self.weights.section_bonus * 0.9)
+                if query_category in self.SPECIALIST_CATEGORIES and item_category in self.GENERIC_CIVIL_CATEGORIES:
+                    mismatch_penalty += self.weights.section_bonus * 0.75
+                    review_flags.append("specialist query routed to civil fallback")
+                score -= mismatch_penalty
                 review_flags.append(f"category mismatch: boq={query_category} library={item_category}")
+            elif query_category in self.SPECIALIST_CATEGORIES and not item_category and generic_match_flag:
+                category_mismatch_flag = True
+                score -= max(self.weights.alias_bonus + 4.0, self.weights.section_bonus)
+                review_flags.append("specialist query matched generic candidate")
 
             if generic_match_flag:
                 score -= max(6.0, self.weights.alias_bonus + 1.0)
@@ -260,6 +284,13 @@ class Matcher:
         if score >= self.weights.review_threshold:
             return "low"
         return "very_low"
+
+    def _categories_compatible(self, query_category: str, item_category: str) -> bool:
+        if not query_category or not item_category:
+            return False
+        if query_category == item_category:
+            return True
+        return item_category in self.CATEGORY_COMPATIBILITY.get(query_category, {query_category})
 
     @staticmethod
     def _flag_reasons(rationale: list[str], confidence_band: str) -> list[str]:

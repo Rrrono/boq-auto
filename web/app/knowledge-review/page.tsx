@@ -18,6 +18,7 @@ const emptyQueue: KnowledgeQueueResponse = {
   candidate_count: 0,
   unmatched_count: 0,
   review_count: 0,
+  focus_areas: [],
   candidates: [],
 };
 
@@ -96,6 +97,25 @@ export default function KnowledgeReviewPage() {
           <strong>Manual review lines</strong>
           <span>{loadingQueue ? "Loading..." : queue.review_count}</span>
         </div>
+      </section>
+
+      <section className="card">
+        <span className="pill">Focus Areas</span>
+        <h3>Where the knowledge base needs work first</h3>
+        {loadingQueue ? (
+          <div className="emptyState">Building the current improvement shortlist...</div>
+        ) : queue.focus_areas.length === 0 ? (
+          <div className="emptyState">No focus areas yet. Price more jobs to build a clearer improvement map.</div>
+        ) : (
+          <div className="metaGrid">
+            {queue.focus_areas.map((area) => (
+              <div key={area.label} className="metaRow">
+                <strong>{area.label}</strong>
+                <span>{area.count} flagged rows</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="card">

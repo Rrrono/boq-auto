@@ -45,6 +45,7 @@ Project overview:
 
 - [docs/project_overview.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/project_overview.md)
 - [docs/workflows.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/workflows.md)
+- [docs/codex_handover.md](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/docs/codex_handover.md)
 - Demo tender inputs: [tender](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/tender)
 
 ## Streamlit Apps

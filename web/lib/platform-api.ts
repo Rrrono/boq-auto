@@ -106,11 +106,17 @@ export type KnowledgeCandidate = {
   section_mismatch_flag: boolean;
 };
 
+export type KnowledgeFocusArea = {
+  label: string;
+  count: number;
+};
+
 export type KnowledgeQueueResponse = {
   scanned_jobs: number;
   candidate_count: number;
   unmatched_count: number;
   review_count: number;
+  focus_areas: KnowledgeFocusArea[];
   candidates: KnowledgeCandidate[];
 };
 

@@ -100,3 +100,22 @@ def test_matcher_flags_category_mismatch_for_text_similar_weak_cluster() -> None
     assert result.category_mismatch_flag is True
     assert "category_mismatch" in result.flag_reasons
     assert result.decision in {"review", "unmatched"}
+
+
+def test_matcher_treats_electrical_support_as_electrical_family() -> None:
+    items = [
+        RateItem("A", "Electrical supply and install transformer", "electrical supply and install transformer", "Electrical", "", "item", 185000, "KES", "Nairobi", "src", "", "", "", "", "", "", "transformer, electrical", "", "", 0, "", True),
+    ]
+    matcher = Matcher(items, [], MatchingWeights(78, 65, 88, 4, 8, 6, 5, 18, 6))
+    line = BOQLine(
+        sheet_name="Electrical Support",
+        row_number=8,
+        description="Supply and install transformer complete",
+        unit="item",
+        inferred_section="Electrical",
+    )
+
+    result = matcher.match(line, "Nairobi")
+
+    assert result.category_mismatch_flag is False
+    assert result.decision in {"matched", "review"}

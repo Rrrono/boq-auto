@@ -48,9 +48,15 @@ class KnowledgeCandidateResponse(BaseModel):
     section_mismatch_flag: bool = False
 
 
+class KnowledgeFocusAreaResponse(BaseModel):
+    label: str
+    count: int = 0
+
+
 class KnowledgeQueueResponse(BaseModel):
     scanned_jobs: int = 0
     candidate_count: int = 0
     unmatched_count: int = 0
     review_count: int = 0
+    focus_areas: list[KnowledgeFocusAreaResponse] = Field(default_factory=list)
     candidates: list[KnowledgeCandidateResponse] = Field(default_factory=list)

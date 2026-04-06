@@ -101,6 +101,7 @@ def test_price_check_and_knowledge_queue() -> None:
     queue = knowledge_response.json()
     assert queue["scanned_jobs"] == 1
     assert queue["candidate_count"] >= 0
+    assert "focus_areas" in queue
     assert "candidates" in queue
     if queue["candidates"]:
         first_candidate = queue["candidates"][0]

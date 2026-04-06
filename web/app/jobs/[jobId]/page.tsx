@@ -102,6 +102,20 @@ export default function JobDetailPage() {
     }
     return "";
   }, [flaggedPercent, pricing]);
+  const topReasons = useMemo(() => {
+    if (!pricing) {
+      return [];
+    }
+    const counts = new Map<string, number>();
+    for (const item of pricing.items) {
+      for (const reason of item.flag_reasons) {
+        counts.set(reason, (counts.get(reason) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 4);
+  }, [pricing]);
 
   async function reloadWorkspace(nextNotice?: string) {
     if (!jobId) {
@@ -243,6 +257,21 @@ export default function JobDetailPage() {
         <section className="alertCard">
           <strong>Review-first signal</strong>
           <p>{reviewMessage}</p>
+        </section>
+      ) : null}
+
+      {topReasons.length > 0 ? (
+        <section className="card">
+          <span className="pill">Hotspots</span>
+          <h3>Most common review triggers in this run</h3>
+          <div className="metaGrid">
+            {topReasons.map(([reason, count]) => (
+              <div key={reason} className="metaRow">
+                <strong>{formatReason(reason)}</strong>
+                <span>{count} rows</span>
+              </div>
+            ))}
+          </div>
         </section>
       ) : null}
 
