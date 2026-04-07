@@ -63,6 +63,7 @@ class ReviewTaskResponse(BaseModel):
     row_number: int
     description: str
     matched_description: str
+    matched_item_code: str = ""
     unit: str
     decision: str
     confidence_score: float
@@ -78,8 +79,12 @@ class ReviewTaskResponse(BaseModel):
     qa_reviewer_uid: str = ""
     qa_reviewer_email: str = ""
     qa_note: str = ""
+    promotion_target: str = ""
+    promotion_status: str = "pending"
+    feedback_action: str = ""
     submitted_at: datetime | None = None
     qa_updated_at: datetime | None = None
+    feedback_logged_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

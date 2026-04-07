@@ -130,6 +130,7 @@ export type ReviewTask = {
   row_number: number;
   description: string;
   matched_description: string;
+  matched_item_code: string;
   unit: string;
   decision: string;
   confidence_score: number;
@@ -145,8 +146,12 @@ export type ReviewTask = {
   qa_reviewer_uid: string;
   qa_reviewer_email: string;
   qa_note: string;
+  promotion_target: string;
+  promotion_status: string;
+  feedback_action: string;
   submitted_at: string | null;
   qa_updated_at: string | null;
+  feedback_logged_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -267,12 +272,18 @@ export async function getKnowledgeQueue(limit = 50, token?: string | null): Prom
 }
 
 export async function listReviewTasks(
-  options?: { status?: string; mine?: boolean },
+  options?: { status?: string; qa_status?: string; promotion_status?: string; mine?: boolean },
   token?: string | null,
 ): Promise<ReviewTask[]> {
   const params = new URLSearchParams();
   if (options?.status) {
     params.set("status", options.status);
+  }
+  if (options?.qa_status) {
+    params.set("qa_status", options.qa_status);
+  }
+  if (options?.promotion_status) {
+    params.set("promotion_status", options.promotion_status);
   }
   if (options?.mine) {
     params.set("mine", "true");

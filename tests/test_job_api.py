@@ -218,10 +218,10 @@ def test_review_task_can_move_into_qa_states() -> None:
     client.post(
         f"/review-tasks/{task_id}/submit",
         json={
-            "decision": "confirm_match",
-            "matched_description": "Confirmed line",
-            "rate": None,
-            "reviewer_note": "Ready for QA.",
+            "decision": "manual_rate",
+            "matched_description": "Manual line",
+            "rate": 2250.0,
+            "reviewer_note": "Ready for QA and promotion planning.",
         },
     )
 
@@ -236,6 +236,9 @@ def test_review_task_can_move_into_qa_states() -> None:
     qa_body = qa_response.json()
     assert qa_body["qa_status"] == "approved"
     assert qa_body["qa_note"] == "Good reviewer submission."
+    assert qa_body["promotion_target"] == "rate_observation"
+    assert qa_body["promotion_status"] == "ready"
+    assert qa_body["feedback_action"] == "rejected"
 
     invalid_qa_response = client.post(
         f"/review-tasks/{task_id}/qa",

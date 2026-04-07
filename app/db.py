@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
 from contextlib import contextmanager
 from typing import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.settings import load_settings
@@ -29,6 +28,29 @@ def init_db() -> None:
     from app import orm_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _ensure_review_task_columns()
+
+
+def _ensure_review_task_columns() -> None:
+    """Additive compatibility for newer review-task fields on existing databases."""
+    inspector = inspect(engine)
+    if "review_tasks" not in inspector.get_table_names():
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("review_tasks")}
+    column_definitions = {
+        "matched_item_code": "VARCHAR(128) NOT NULL DEFAULT ''",
+        "promotion_target": "VARCHAR(64) NOT NULL DEFAULT ''",
+        "promotion_status": "VARCHAR(64) NOT NULL DEFAULT 'pending'",
+        "feedback_action": "VARCHAR(32) NOT NULL DEFAULT ''",
+        "feedback_logged_at": "TIMESTAMP NULL",
+    }
+
+    with engine.begin() as connection:
+        for column_name, sql_definition in column_definitions.items():
+            if column_name in existing_columns:
+                continue
+            connection.execute(text(f"ALTER TABLE review_tasks ADD COLUMN {column_name} {sql_definition}"))
 
 
 @contextmanager

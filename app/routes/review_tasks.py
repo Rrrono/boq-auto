@@ -26,12 +26,19 @@ router = APIRouter(tags=["review-tasks"])
 @router.get("/review-tasks", response_model=list[ReviewTaskResponse])
 def list_review_tasks_endpoint(
     status: str | None = Query(default=None),
+    qa_status: str | None = Query(default=None),
+    promotion_status: str | None = Query(default=None),
     mine: bool = Query(default=False),
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> list[ReviewTaskResponse]:
     reviewer_uid = user.uid if mine else None
-    return [serialize_review_task(task) for task in list_review_tasks(db, status=status, reviewer_uid=reviewer_uid)]
+    tasks = list_review_tasks(db, status=status, reviewer_uid=reviewer_uid)
+    if qa_status:
+        tasks = [task for task in tasks if task.qa_status == qa_status]
+    if promotion_status:
+        tasks = [task for task in tasks if task.promotion_status == promotion_status]
+    return [serialize_review_task(task) for task in tasks]
 
 
 @router.post("/jobs/{job_id}/review-tasks/sync", response_model=ReviewTaskSyncResponse)

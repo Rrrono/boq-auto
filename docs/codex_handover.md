@@ -160,6 +160,11 @@ As of the latest tracked state in this repo:
 - the first taxonomy-compatible schema slice has started in `src/cost_schema.py`:
   - normalized items now support `domain`, `work_family`, `item_kind`, and `project_context`
   - these fields are inferred from current item descriptions / categories so the schema can evolve without breaking the Excel rate library flow
+- the current in-flight reviewer slice extends tasks toward learning-loop hooks:
+  - QA outcomes now map to `promotion_target` / `promotion_status`
+  - approved reviewer confirmations can feed match-feedback logging when a canonical item code exists
+  - the hosted reviewer inbox now exposes promotion readiness and learning-hook status directly
+- the web UI now uses a darker operations-style theme so the hosted platform feels more deliberate and less prototype-like
 
 Recent important commits:
 
@@ -211,6 +216,12 @@ Cloud SQL-backed web platform/API deployment depends on:
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
 
 ## Current Priorities
+
+Immediate checkpoint rule for future Codex instances:
+
+- update this handover file before substantial new work whenever a token or capacity cutoff feels possible
+- prefer coherent checkpoints with verification over large half-finished diffs
+- preserve the user's preference for intermittent commits/pushes and a handover that is current enough for direct takeover
 
 ### Research-backed architecture note
 
@@ -271,10 +282,10 @@ The current reviewer queue is intentionally MVP-level. The next best extensions 
 
 The next active slice after this handover update is:
 
-1. finish validating the first taxonomy-compatible schema implementation in `src/cost_schema.py`
-2. keep it backward-compatible with the current rate library and Excel flow
-3. connect approved/escalated review tasks to promotion and feedback hooks after the first taxonomy slice lands
-4. preserve the review-first architecture without creating a separate moderation pipeline
+1. turn `promotion_target` / `promotion_status` reviewer outcomes into real persistence flows for aliases, candidate review, and rate observations
+2. keep the taxonomy slice backward-compatible with the current rate library and Excel flow
+3. preserve the review-first architecture without creating a separate moderation pipeline
+4. keep the darker hosted UI direction consistent across new pages and states
 5. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
 
 ## Working Principles For The Next Codex
@@ -308,10 +319,10 @@ When improving quality, prefer extending these current seams:
 
 If handing over right now, the best immediate task is:
 
-1. connect reviewer QA outcomes to promotion/feedback hooks
-2. define the first canonical BOQ AUTO taxonomy slice
-3. extend the schema so current flat items can map into domain / family / category / canonical item structure
-4. keep matcher and reviewer UX aligned with that taxonomy
+1. turn `promotion_target` / `promotion_status` reviewer outcomes into real persistence flows for aliases, candidate review, and rate observations
+2. define the next canonical BOQ AUTO taxonomy slice beyond the initial inferred fields
+3. extend the schema so current flat items can map into domain / family / category / canonical item structure more explicitly
+4. keep matcher and reviewer UX aligned with that taxonomy and the darker hosted UI direction
 5. only then continue deeper matcher tuning against the improved knowledge structure
 
 That continues the current product direction without wasting the architecture already built.

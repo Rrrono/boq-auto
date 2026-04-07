@@ -1,12 +1,12 @@
 :root {
-  --bg: #f2efe7;
-  --panel: #fffdf8;
-  --ink: #1f2a1f;
-  --muted: #5e685c;
-  --line: #d6d0c4;
-  --accent: #2f6a4f;
-  --accent-soft: #d8e9df;
-  --warn: #8b5f17;
+  --bg: #0f1715;
+  --panel: #16211d;
+  --ink: #eef4ef;
+  --muted: #9aaca0;
+  --line: #2a3933;
+  --accent: #7fdaa9;
+  --accent-soft: #20382d;
+  --warn: #e5b45a;
 }
 
 * {
@@ -17,8 +17,9 @@ body {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
   background:
-    radial-gradient(circle at top left, #fcf4dd, transparent 35%),
-    linear-gradient(180deg, #f7f2e9 0%, var(--bg) 100%);
+    radial-gradient(circle at top left, rgba(127, 218, 169, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(76, 130, 107, 0.18), transparent 24%),
+    linear-gradient(180deg, #0b100f 0%, var(--bg) 100%);
   color: var(--ink);
 }
 
@@ -36,10 +37,11 @@ a {
 .sidebar {
   border-right: 1px solid var(--line);
   padding: 24px;
-  background: rgba(255, 253, 248, 0.88);
+  background: rgba(16, 24, 21, 0.92);
   display: grid;
   align-content: start;
   gap: 18px;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
 .brand {
@@ -64,6 +66,13 @@ a {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--panel);
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.nav a:hover {
+  transform: translateX(2px);
+  border-color: rgba(127, 218, 169, 0.45);
+  background: #1a2924;
 }
 
 .main {
@@ -74,7 +83,7 @@ a {
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(22, 33, 29, 0.84);
   display: grid;
   gap: 10px;
 }
@@ -163,7 +172,7 @@ a {
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: #111917;
   color: var(--ink);
 }
 
@@ -177,9 +186,10 @@ a {
   border-radius: 999px;
   border: 0;
   background: var(--accent);
-  color: #fff;
+  color: #082015;
   cursor: pointer;
   width: fit-content;
+  font-weight: 700;
 }
 
 .secondaryButton {
@@ -190,7 +200,7 @@ a {
   padding: 10px 14px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: #111917;
   color: var(--ink);
   cursor: pointer;
   width: fit-content;
@@ -211,7 +221,7 @@ a {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: #111917;
 }
 
 .metaRow strong {
@@ -246,7 +256,7 @@ th {
   padding: 16px;
   border: 1px dashed var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(17, 25, 23, 0.7);
 }
 
 .statusPill {
@@ -255,7 +265,7 @@ th {
   gap: 6px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: #edf4ef;
+  background: #153023;
   color: var(--accent);
 }
 
@@ -266,29 +276,29 @@ th {
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: #111917;
   font-size: 0.78rem;
   line-height: 1.2;
   margin: 0 6px 6px 0;
 }
 
 .confidence-high {
-  background: #edf7ef;
-  color: #29573b;
-  border-color: #b8d6bd;
+  background: #173325;
+  color: #9be6bc;
+  border-color: #356f54;
 }
 
 .confidence-medium {
-  background: #eef4fb;
-  color: #2b547c;
-  border-color: #bfd0e3;
+  background: #1a2f41;
+  color: #9ecaf6;
+  border-color: #3e6587;
 }
 
 .confidence-low,
 .confidence-very_low {
-  background: #fff4e5;
-  color: #8b5f17;
-  border-color: #e6c994;
+  background: #3b2a12;
+  color: #f0c977;
+  border-color: #8f6a2e;
 }
 
 .reasonList {
@@ -305,25 +315,25 @@ th {
   font-size: 0.78rem;
   line-height: 1.2;
   border: 1px solid var(--line);
-  background: #fff;
+  background: #111917;
 }
 
 .decision-matched {
-  background: #edf7ef;
-  color: #29573b;
-  border-color: #b8d6bd;
+  background: #173325;
+  color: #9be6bc;
+  border-color: #356f54;
 }
 
 .decision-review {
-  background: #fff4e5;
-  color: #8b5f17;
-  border-color: #e6c994;
+  background: #3b2a12;
+  color: #f0c977;
+  border-color: #8f6a2e;
 }
 
 .decision-unmatched {
-  background: #fff0ec;
-  color: #8f3225;
-  border-color: #e1b1a6;
+  background: #3a1718;
+  color: #f3a6a6;
+  border-color: #7d3a3d;
 }
 
 .triageLegend {
@@ -337,7 +347,7 @@ th {
   padding: 8px 10px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(17, 25, 23, 0.84);
   color: var(--muted);
   font-size: 0.85rem;
 }
@@ -385,7 +395,7 @@ th {
 
 .errorText {
   margin: 0;
-  color: #9c2f2f;
+  color: #f3a6a6;
 }
 
 .alertCard {
@@ -405,15 +415,15 @@ th {
 }
 
 .alertError {
-  background: #fff0ec;
-  border-color: #e1b1a6;
-  color: #8f3225;
+  background: #3a1718;
+  border-color: #7d3a3d;
+  color: #f3a6a6;
 }
 
 .alertSuccess {
-  background: #edf7ef;
-  border-color: #b8d6bd;
-  color: #29573b;
+  background: #173325;
+  border-color: #356f54;
+  color: #9be6bc;
 }
 
 .inlineActions {

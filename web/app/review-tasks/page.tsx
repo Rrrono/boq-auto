@@ -17,15 +17,26 @@ function formatReason(reason: string) {
   return reason.replaceAll("_", " ");
 }
 
+type ReviewDraft = {
+  decision: string;
+  matched_description: string;
+  rate: string;
+  reviewer_note: string;
+  qa_status: string;
+  qa_note: string;
+};
+
 export default function ReviewTasksPage() {
   const { configured, loading, user, getIdToken } = useAuth();
   const [tasks, setTasks] = useState<ReviewTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [tasksError, setTasksError] = useState("");
   const [statusFilter, setStatusFilter] = useState("open");
+  const [qaFilter, setQaFilter] = useState("");
+  const [promotionFilter, setPromotionFilter] = useState("");
   const [mineOnly, setMineOnly] = useState(false);
   const [savingTaskId, setSavingTaskId] = useState<number | null>(null);
-  const [drafts, setDrafts] = useState<Record<number, { decision: string; matched_description: string; rate: string; reviewer_note: string; qa_status: string; qa_note: string }>>({});
+  const [drafts, setDrafts] = useState<Record<number, ReviewDraft>>({});
 
   useEffect(() => {
     if (loading || (configured && !user)) {
@@ -38,7 +49,15 @@ export default function ReviewTasksPage() {
       setTasksError("");
       try {
         const token = await getIdToken();
-        const nextTasks = await listReviewTasks({ status: statusFilter || undefined, mine: mineOnly }, token);
+        const nextTasks = await listReviewTasks(
+          {
+            status: statusFilter || undefined,
+            qa_status: qaFilter || undefined,
+            promotion_status: promotionFilter || undefined,
+            mine: mineOnly,
+          },
+          token,
+        );
         if (!cancelled) {
           setTasks(nextTasks);
         }
@@ -58,7 +77,7 @@ export default function ReviewTasksPage() {
     return () => {
       cancelled = true;
     };
-  }, [configured, getIdToken, loading, mineOnly, statusFilter, user]);
+  }, [configured, getIdToken, loading, mineOnly, promotionFilter, qaFilter, statusFilter, user]);
 
   const summary = useMemo(() => {
     const counts = new Map<string, number>();
@@ -72,7 +91,7 @@ export default function ReviewTasksPage() {
     };
   }, [tasks]);
 
-  function getDraft(task: ReviewTask) {
+  function getDraft(task: ReviewTask): ReviewDraft {
     return drafts[task.id] ?? {
       decision: task.decision === "unmatched" ? "manual_rate" : "confirm_match",
       matched_description: task.matched_description,
@@ -85,7 +104,15 @@ export default function ReviewTasksPage() {
 
   async function refreshTasks() {
     const token = await getIdToken();
-    const nextTasks = await listReviewTasks({ status: statusFilter || undefined, mine: mineOnly }, token);
+    const nextTasks = await listReviewTasks(
+      {
+        status: statusFilter || undefined,
+        qa_status: qaFilter || undefined,
+        promotion_status: promotionFilter || undefined,
+        mine: mineOnly,
+      },
+      token,
+    );
     setTasks(nextTasks);
   }
 
@@ -185,6 +212,10 @@ export default function ReviewTasksPage() {
           <span>{loadingTasks ? "Loading..." : tasks.filter((task) => task.status === "submitted").length}</span>
         </div>
         <div className="metaRow">
+          <strong>Promotion-ready</strong>
+          <span>{loadingTasks ? "Loading..." : tasks.filter((task) => task.promotion_status === "ready").length}</span>
+        </div>
+        <div className="metaRow">
           <strong>Signed in reviewer</strong>
           <span>{user?.email || "Unknown reviewer"}</span>
         </div>
@@ -209,6 +240,27 @@ export default function ReviewTasksPage() {
               <option value="">All</option>
             </select>
           </label>
+          <label>
+            QA
+            <select value={qaFilter} onChange={(event) => setQaFilter(event.target.value)}>
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="escalated">Escalated</option>
+            </select>
+          </label>
+          <label>
+            Promotion
+            <select value={promotionFilter} onChange={(event) => setPromotionFilter(event.target.value)}>
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="ready">Ready</option>
+              <option value="logged">Logged</option>
+              <option value="needs_attention">Needs attention</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
           <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input type="checkbox" checked={mineOnly} onChange={(event) => setMineOnly(event.target.checked)} />
             My tasks only
@@ -231,7 +283,7 @@ export default function ReviewTasksPage() {
                       <span className="pill">{task.status}</span>
                       <h3>{task.description}</h3>
                       <p className="helperText">
-                        Job <Link href={`/jobs/${task.job_id}`}>{task.job_id}</Link> · {task.sheet_name || "Sheet"} row {task.row_number}
+                        Job <Link href={`/jobs/${task.job_id}`}>{task.job_id}</Link> - {task.sheet_name || "Sheet"} row {task.row_number}
                       </p>
                     </div>
                     <div className="triageStack">
@@ -250,6 +302,10 @@ export default function ReviewTasksPage() {
                       <span>{task.matched_description || "-"}</span>
                     </div>
                     <div className="metaRow">
+                      <strong>Matched item code</strong>
+                      <span className="monoText">{task.matched_item_code || "-"}</span>
+                    </div>
+                    <div className="metaRow">
                       <strong>Unit</strong>
                       <span>{task.unit || "-"}</span>
                     </div>
@@ -260,6 +316,10 @@ export default function ReviewTasksPage() {
                     <div className="metaRow">
                       <strong>QA status</strong>
                       <span>{task.qa_status}</span>
+                    </div>
+                    <div className="metaRow">
+                      <strong>Promotion</strong>
+                      <span>{task.promotion_target ? `${task.promotion_target} - ${task.promotion_status}` : task.promotion_status}</span>
                     </div>
                   </div>
 
@@ -400,8 +460,14 @@ export default function ReviewTasksPage() {
                         {savingTaskId === task.id ? "Saving QA..." : "Save QA state"}
                       </button>
                       <p className="helperText">
-                        Current QA owner: {task.qa_reviewer_email || "Unassigned"} {task.qa_updated_at ? `· updated ${new Date(task.qa_updated_at).toLocaleString()}` : ""}
+                        Current QA owner: {task.qa_reviewer_email || "Unassigned"} {task.qa_updated_at ? ` - updated ${new Date(task.qa_updated_at).toLocaleString()}` : ""}
                       </p>
+                      {task.feedback_action ? (
+                        <p className="helperText">
+                          Learning hook: {task.feedback_action}
+                          {task.feedback_logged_at ? ` - logged ${new Date(task.feedback_logged_at).toLocaleString()}` : ""}
+                        </p>
+                      ) : null}
                     </form>
                   ) : null}
                 </article>

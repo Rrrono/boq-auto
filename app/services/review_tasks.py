@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
+import os
 
 from sqlalchemy.orm import Session
 
 from app.models.job import ReviewTaskResponse, ReviewTaskSyncResponse
 from app.orm_models import Job, JobRun, ReviewTask
+from src.config_loader import load_config
+from src.cost_schema import CostDatabase, schema_database_path
+from src.release_manager import current_production_database_path
 
 
 def _row_key(item: dict) -> str:
@@ -38,6 +43,7 @@ def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
         row_number=task.row_number,
         description=task.description,
         matched_description=task.matched_description,
+        matched_item_code=task.matched_item_code,
         unit=task.unit,
         decision=task.decision,
         confidence_score=task.confidence_score,
@@ -53,8 +59,12 @@ def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
         qa_reviewer_uid=task.qa_reviewer_uid,
         qa_reviewer_email=task.qa_reviewer_email,
         qa_note=task.qa_note,
+        promotion_target=task.promotion_target,
+        promotion_status=task.promotion_status,
+        feedback_action=task.feedback_action,
         submitted_at=task.submitted_at,
         qa_updated_at=task.qa_updated_at,
+        feedback_logged_at=task.feedback_logged_at,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -95,6 +105,7 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
         task.row_number = int(item.get("row_number") or 0)
         task.description = str(item.get("description") or "")
         task.matched_description = str(item.get("matched_description") or "")
+        task.matched_item_code = str(item.get("matched_item_code") or "")
         task.unit = str(item.get("unit") or "")
         task.decision = str(item.get("decision") or "review")
         task.confidence_score = float(item.get("confidence_score") or 0.0)
@@ -164,13 +175,63 @@ def submit_review_task(
     task.qa_reviewer_uid = ""
     task.qa_reviewer_email = ""
     task.qa_note = ""
+    task.promotion_target = ""
+    task.promotion_status = "pending"
+    task.feedback_action = ""
     now = datetime.now(timezone.utc)
     task.submitted_at = now
     task.qa_updated_at = None
+    task.feedback_logged_at = None
     task.updated_at = now
     db.commit()
     db.refresh(task)
     return task
+
+
+def _resolve_schema_database_path() -> Path | None:
+    override = os.getenv("BOQ_AUTO_API_DB_PATH", "").strip()
+    if override:
+        return schema_database_path(override)
+    config = load_config()
+    db_path = current_production_database_path(config)
+    if not db_path.exists():
+        return None
+    return schema_database_path(db_path)
+
+
+def _promotion_plan(task: ReviewTask, qa_status: str) -> tuple[str, str, str]:
+    submitted_decision = (task.submitted_decision or "").strip().lower()
+    if qa_status == "approved":
+        if submitted_decision == "confirm_match" and task.matched_item_code:
+            return "match_feedback", "logged", "accepted"
+        if submitted_decision == "manual_rate":
+            return "rate_observation", "ready", "rejected"
+        if submitted_decision == "no_good_match":
+            return "candidate_review", "ready", "rejected"
+    if qa_status == "escalated":
+        return "candidate_review", "needs_attention", ""
+    if qa_status == "rejected":
+        return "", "closed", ""
+    return "", "pending", ""
+
+
+def _log_feedback_if_possible(task: ReviewTask, feedback_action: str) -> datetime | None:
+    if not feedback_action or not task.matched_item_code:
+        return None
+    schema_path = _resolve_schema_database_path()
+    if schema_path is None or not Path(schema_path).exists():
+        return None
+    repository = CostDatabase(schema_path)
+    resolved_item_id = repository.resolve_item_id(task.matched_item_code)
+    if not resolved_item_id:
+        return None
+    repository.log_match_feedback(
+        query_text=task.description,
+        item_id=resolved_item_id,
+        action=feedback_action,
+        alternative_item_id="",
+    )
+    return datetime.now(timezone.utc)
 
 
 def qa_review_task(
@@ -187,8 +248,13 @@ def qa_review_task(
     task.qa_reviewer_uid = reviewer_uid
     task.qa_reviewer_email = reviewer_email or ""
     task.qa_note = qa_note.strip()
+    promotion_target, promotion_status, feedback_action = _promotion_plan(task, normalized_status)
+    task.promotion_target = promotion_target
+    task.promotion_status = promotion_status
+    task.feedback_action = feedback_action
     now = datetime.now(timezone.utc)
     task.qa_updated_at = now
+    task.feedback_logged_at = _log_feedback_if_possible(task, feedback_action)
     task.updated_at = now
     db.commit()
     db.refresh(task)
