@@ -22,6 +22,7 @@ export default function ReviewTasksPage() {
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [tasksError, setTasksError] = useState("");
   const [statusFilter, setStatusFilter] = useState("open");
+  const [mineOnly, setMineOnly] = useState(false);
   const [savingTaskId, setSavingTaskId] = useState<number | null>(null);
   const [drafts, setDrafts] = useState<Record<number, { decision: string; matched_description: string; rate: string; reviewer_note: string }>>({});
 
@@ -36,7 +37,7 @@ export default function ReviewTasksPage() {
       setTasksError("");
       try {
         const token = await getIdToken();
-        const nextTasks = await listReviewTasks({ status: statusFilter || undefined }, token);
+        const nextTasks = await listReviewTasks({ status: statusFilter || undefined, mine: mineOnly }, token);
         if (!cancelled) {
           setTasks(nextTasks);
         }
@@ -56,7 +57,7 @@ export default function ReviewTasksPage() {
     return () => {
       cancelled = true;
     };
-  }, [configured, getIdToken, loading, statusFilter, user]);
+  }, [configured, getIdToken, loading, mineOnly, statusFilter, user]);
 
   const summary = useMemo(() => {
     const counts = new Map<string, number>();
@@ -81,7 +82,7 @@ export default function ReviewTasksPage() {
 
   async function refreshTasks() {
     const token = await getIdToken();
-    const nextTasks = await listReviewTasks({ status: statusFilter || undefined }, token);
+    const nextTasks = await listReviewTasks({ status: statusFilter || undefined, mine: mineOnly }, token);
     setTasks(nextTasks);
   }
 
@@ -158,6 +159,10 @@ export default function ReviewTasksPage() {
           <strong>Signed in reviewer</strong>
           <span>{user?.email || "Unknown reviewer"}</span>
         </div>
+        <div className="metaRow">
+          <strong>Queue scope</strong>
+          <span>{mineOnly ? "My tasks only" : "Shared queue"}</span>
+        </div>
       </section>
 
       <section className="card">
@@ -174,6 +179,10 @@ export default function ReviewTasksPage() {
               <option value="submitted">Submitted</option>
               <option value="">All</option>
             </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" checked={mineOnly} onChange={(event) => setMineOnly(event.target.checked)} />
+            My tasks only
           </label>
         </div>
 

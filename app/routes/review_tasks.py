@@ -54,6 +54,10 @@ def claim_review_task_endpoint(
     task = get_review_task(db, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Review task not found.")
+    if task.status == "submitted":
+        raise HTTPException(status_code=409, detail="Submitted review tasks cannot be claimed again.")
+    if task.reviewer_uid and task.reviewer_uid != user.uid and task.status == "claimed":
+        raise HTTPException(status_code=409, detail="This review task is already claimed by another reviewer.")
     return serialize_review_task(claim_review_task(db, task, reviewer_uid=user.uid, reviewer_email=user.email))
 
 
@@ -67,6 +71,10 @@ def submit_review_task_endpoint(
     task = get_review_task(db, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Review task not found.")
+    if task.status == "submitted":
+        raise HTTPException(status_code=409, detail="This review task has already been submitted.")
+    if task.reviewer_uid and task.reviewer_uid != user.uid:
+        raise HTTPException(status_code=403, detail="Only the claiming reviewer can submit this task.")
     updated = submit_review_task(
         db,
         task,

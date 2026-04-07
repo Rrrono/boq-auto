@@ -157,3 +157,45 @@ def test_sync_claim_and_submit_review_tasks() -> None:
     assert submitted["status"] == "submitted"
     assert submitted["submitted_decision"] == "manual_rate"
     assert submitted["submitted_rate"] == 1250.0
+
+
+def test_review_task_cannot_be_claimed_or_submitted_twice() -> None:
+    create_response = client.post("/jobs", json={"title": "Reviewer Guardrail Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    client.post(
+        f"/jobs/{job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("sample.xlsx", _build_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    client.post(f"/jobs/{job_id}/price-boq")
+    sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    task_id = sync_response.json()["tasks"][0]["id"]
+
+    first_claim = client.post(f"/review-tasks/{task_id}/claim")
+    assert first_claim.status_code == 200
+
+    first_submit = client.post(
+        f"/review-tasks/{task_id}/submit",
+        json={
+            "decision": "confirm_match",
+            "matched_description": "Confirmed from review queue",
+            "rate": None,
+            "reviewer_note": "First submission",
+        },
+    )
+    assert first_submit.status_code == 200
+
+    second_claim = client.post(f"/review-tasks/{task_id}/claim")
+    assert second_claim.status_code == 409
+
+    second_submit = client.post(
+        f"/review-tasks/{task_id}/submit",
+        json={
+            "decision": "no_good_match",
+            "matched_description": "",
+            "rate": None,
+            "reviewer_note": "Second submission should fail",
+        },
+    )
+    assert second_submit.status_code == 409

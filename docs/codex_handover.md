@@ -123,8 +123,12 @@ The foundations for this phase already exist in `src/`, but the hosted platform 
   Job orchestration and run/result persistence.
 - `app/services/insights.py`
   Review-first evidence extraction from recent job results.
+- `app/routes/review_tasks.py`
+  Protected reviewer-task API for syncing weak rows into claimable review work.
+- `app/services/review_tasks.py`
+  Task generation, claiming, and submission logic for the hosted reviewer workflow.
 - `web/`
-  Next.js hosted frontend for login, jobs, price checker, and knowledge review.
+  Next.js hosted frontend for login, jobs, price checker, knowledge review, and reviewer tasks.
 
 ### Review and learning foundations
 
@@ -146,9 +150,16 @@ As of the latest tracked state in this repo:
 - workbook parsing and pricing flow are working
 - malformed workbook metadata handling was added
 - match diagnostics now flow through engine, audit, API, and UI
+- reviewer task queue MVP now exists in the hosted platform:
+  - weak job rows can be synced into review tasks
+  - reviewers can claim tasks
+  - reviewers can submit structured review responses
+  - the queue supports shared scope and "my tasks only" scope
+  - backend guardrails prevent one reviewer from submitting another reviewer's claimed task
 
 Recent important commits:
 
+- `4550f0e` Add reviewer task queue MVP
 - `219bf9f` Add review-first match diagnostics across API and UI
 - `8e47fd7` Harden Excel workbook loading for malformed metadata
 - `2e70630` Allow hosted frontend CORS on protected API routes
@@ -219,7 +230,17 @@ Improve pricing quality, especially for weak/non-core categories:
 1. strengthen category-aware and section-aware match guardrails
 2. improve review queue usefulness and triage UX
 3. identify top missing knowledge clusters from real bad runs
-4. prepare hosted reviewer action workflows that later feed promotions and learning
+4. extend hosted reviewer action workflows so submitted tasks can feed promotions and learning
+
+### Immediate reviewer-workflow follow-up
+
+The current reviewer queue is intentionally MVP-level. The next best extensions are:
+
+- reviewer QA states such as approved/rejected/escalated
+- bulk actions for grouped weak items
+- promotion hooks from submitted review tasks into the existing review/promotion foundations
+- reviewer performance and workload summaries
+- clearer mapping between submitted task outcomes and `match_feedback` / promotion flows
 
 ## Working Principles For The Next Codex
 
