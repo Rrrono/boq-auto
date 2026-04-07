@@ -13,7 +13,7 @@ def test_schema_creation_creates_expected_tables(tmp_path) -> None:
     assert schema_path == schema_database_path(tmp_path / "master.xlsx")
     with sqlite3.connect(schema_path) as conn:
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert {"sources", "items", "aliases", "ingestion_logs", "item_embeddings", "match_feedback"} <= tables
+    assert {"sources", "items", "aliases", "ingestion_logs", "item_embeddings", "match_feedback", "rate_observations", "candidate_review_records", "alias_suggestions"} <= tables
 
 
 def test_excel_import_and_export_round_trip(tmp_path) -> None:
@@ -50,6 +50,39 @@ def test_insert_items_and_embeddings(tmp_path) -> None:
     assert feedback.action == "accepted"
     assert composed_embedding_text(item) == "civil_works | earthworks | earthworks | work_item | civil_general | soil | Excavation | m3"
     assert repository.resolve_item_id("A1") == item.id
+
+
+def test_review_artifact_tables_can_store_records(tmp_path) -> None:
+    repository = CostDatabase(tmp_path / "master.xlsx")
+    repository.initialize()
+
+    observation = repository.record_rate_observation(
+        "Excavate rock trench",
+        "Excavate rock trench",
+        "m3",
+        4200.0,
+        source="review_task",
+        reviewer="reviewer@example.com",
+        metadata={"task_id": 12},
+    )
+    candidate = repository.record_candidate_review(
+        "Engineer office container",
+        "Engineer office container",
+        "item",
+        reason="needs specialist review",
+        reviewer="qa@example.com",
+        metadata={"task_id": 13},
+    )
+    alias = repository.record_alias_suggestion(
+        "motor grader with ripper",
+        "Motor grader complete with hydraulic ripper or scarifier",
+        reviewer="reviewer@example.com",
+        metadata={"task_id": 14},
+    )
+
+    assert repository.fetch_rate_observations()[0].id == observation.id
+    assert repository.fetch_candidate_reviews()[0].id == candidate.id
+    assert repository.fetch_alias_suggestions()[0].id == alias.id
 
 
 def test_taxonomy_fields_are_inferred_for_equipment_and_utilities() -> None:

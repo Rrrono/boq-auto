@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from io import BytesIO
+import os
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from app.db import Base, engine, init_db
+from app.db import SessionLocal
 from app.main import app
+from app.orm_models import JobRun, ReviewTask
+from src.cost_schema import CostDatabase, schema_database_path
 
 
 client = TestClient(app)
@@ -24,9 +29,32 @@ def _build_workbook_bytes() -> bytes:
     return stream.getvalue()
 
 
+def _build_unmatched_workbook_bytes() -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "BOQ"
+    sheet.append(["Description", "Unit", "Quantity"])
+    sheet.append(["Engineer office modular container with kitchenette", "item", 1])
+    stream = BytesIO()
+    workbook.save(stream)
+    return stream.getvalue()
+
+
+def _build_runtime_database(path: Path) -> None:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "RateLibrary"
+    sheet.append(["item_code", "description", "normalized_description", "section", "subsection", "unit", "rate"])
+    sheet.append(["A1", "Excavate foundation trench", "excavate foundation trench", "earthworks", "", "m3", 1200])
+    alias_sheet = workbook.create_sheet("Aliases")
+    alias_sheet.append(["alias", "canonical_term", "section_bias", "notes"])
+    workbook.save(path)
+
+
 def setup_function() -> None:
     Base.metadata.drop_all(bind=engine)
     init_db()
+    os.environ.pop("BOQ_AUTO_API_DB_PATH", None)
 
 
 def test_create_job_and_list_jobs() -> None:
@@ -169,7 +197,7 @@ def test_review_task_cannot_be_claimed_or_submitted_twice() -> None:
     client.post(
         f"/jobs/{job_id}/files",
         data={"file_type": "boq"},
-        files={"file": ("sample.xlsx", _build_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={"file": ("sample.xlsx", _build_unmatched_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
     client.post(f"/jobs/{job_id}/price-boq")
     sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
@@ -211,7 +239,7 @@ def test_review_task_can_move_into_qa_states() -> None:
     client.post(
         f"/jobs/{job_id}/files",
         data={"file_type": "boq"},
-        files={"file": ("sample.xlsx", _build_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={"file": ("sample.xlsx", _build_unmatched_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
     client.post(f"/jobs/{job_id}/price-boq")
     sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
@@ -240,7 +268,7 @@ def test_review_task_can_move_into_qa_states() -> None:
     assert qa_body["qa_status"] == "approved"
     assert qa_body["qa_note"] == "Good reviewer submission."
     assert qa_body["promotion_target"] == "rate_observation"
-    assert qa_body["promotion_status"] == "ready"
+    assert qa_body["promotion_status"] == "logged"
     assert qa_body["feedback_action"] == "rejected"
 
     invalid_qa_response = client.post(
@@ -251,6 +279,84 @@ def test_review_task_can_move_into_qa_states() -> None:
         },
     )
     assert invalid_qa_response.status_code == 400
+
+
+def test_approved_manual_rate_creates_rate_observation(tmp_path) -> None:
+    schema_source = tmp_path / "runtime_master.xlsx"
+    _build_runtime_database(schema_source)
+    os.environ["BOQ_AUTO_API_DB_PATH"] = str(schema_source)
+    repository = CostDatabase(schema_source)
+    repository.initialize()
+
+    create_response = client.post("/jobs", json={"title": "Reviewer Promotion Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    with SessionLocal() as db:
+        job_run = JobRun(
+            job_id=job_id,
+            run_type="price_boq",
+            status="completed",
+            processed=1,
+            matched=0,
+            flagged=1,
+            total_cost=0.0,
+            currency="KES",
+            output_storage_uri="",
+            audit_storage_uri="",
+            result_payload="{}",
+        )
+        db.add(job_run)
+        db.flush()
+        task = ReviewTask(
+            job_id=job_id,
+            job_run_id=job_run.id,
+            status="claimed",
+            source_row_key="BOQ:2:Engineer office modular container with kitchenette",
+            sheet_name="BOQ",
+            row_number=2,
+            description="Engineer office modular container with kitchenette",
+            matched_description="",
+            matched_item_code="",
+            task_type="manual_rate_entry",
+            task_question="Enter a practical rate or confirm the item should remain unmatched.",
+            response_schema_json='["manual_rate","no_good_match","reviewer_note"]',
+            unit="item",
+            decision="unmatched",
+            confidence_score=0.0,
+            confidence_band="very_low",
+            flag_reasons_json='["confidence_very_low"]',
+            reviewer_uid="local-dev",
+            reviewer_email="",
+        )
+        db.add(task)
+        db.commit()
+        task_id = task.id
+
+    client.post(
+        f"/review-tasks/{task_id}/submit",
+        json={
+          "decision": "manual_rate",
+          "matched_description": "Manual reviewed trench rate",
+          "rate": 3100.0,
+          "reviewer_note": "Use reviewed site rate.",
+        },
+    )
+    qa_response = client.post(
+        f"/review-tasks/{task_id}/qa",
+        json={
+            "qa_status": "approved",
+            "qa_note": "Promote reviewed manual rate.",
+        },
+    )
+
+    assert qa_response.status_code == 200
+    qa_body = qa_response.json()
+    assert qa_body["promotion_status"] == "logged"
+
+    observations = repository.fetch_rate_observations()
+    assert observations
+    assert observations[0].rate == 3100.0
+    assert observations[0].canonical_description == "Manual reviewed trench rate"
 
 
 def test_unmatched_rows_create_manual_rate_tasks() -> None:

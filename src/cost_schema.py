@@ -99,6 +99,45 @@ class MatchFeedback:
         return self.timestamp
 
 
+@dataclass(slots=True)
+class RateObservation:
+    id: str
+    description: str
+    canonical_description: str
+    unit: str
+    rate: float
+    source: str
+    reviewer: str
+    status: str
+    metadata_json: str
+    created_at: str
+
+
+@dataclass(slots=True)
+class CandidateReviewRecord:
+    id: str
+    description: str
+    suggested_description: str
+    unit: str
+    reason: str
+    reviewer: str
+    status: str
+    metadata_json: str
+    created_at: str
+
+
+@dataclass(slots=True)
+class AliasSuggestion:
+    id: str
+    alias: str
+    canonical_term: str
+    section_bias: str
+    reviewer: str
+    status: str
+    metadata_json: str
+    created_at: str
+
+
 class CostDatabase:
     """SQLite-backed normalized cost-data store with Excel compatibility helpers."""
 
@@ -184,6 +223,51 @@ class CostDatabase:
                     action TEXT NOT NULL,
                     alternative_item_id TEXT NOT NULL DEFAULT '',
                     timestamp TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rate_observations (
+                    id TEXT PRIMARY KEY,
+                    description TEXT NOT NULL,
+                    canonical_description TEXT NOT NULL,
+                    unit TEXT NOT NULL,
+                    rate REAL NOT NULL,
+                    source TEXT NOT NULL,
+                    reviewer TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS candidate_review_records (
+                    id TEXT PRIMARY KEY,
+                    description TEXT NOT NULL,
+                    suggested_description TEXT NOT NULL,
+                    unit TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    reviewer TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS alias_suggestions (
+                    id TEXT PRIMARY KEY,
+                    alias TEXT NOT NULL,
+                    canonical_term TEXT NOT NULL,
+                    section_bias TEXT NOT NULL DEFAULT '',
+                    reviewer TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL
                 )
                 """
             )
@@ -477,6 +561,210 @@ class CostDatabase:
                 (item_ref, item_ref),
             ).fetchone()
         return str(row[0]) if row else ""
+
+    def record_rate_observation(
+        self,
+        description: str,
+        canonical_description: str,
+        unit: str,
+        rate: float,
+        *,
+        source: str,
+        reviewer: str,
+        status: str = "approved",
+        metadata: dict[str, Any] | None = None,
+    ) -> RateObservation:
+        self.initialize()
+        record = RateObservation(
+            id=str(uuid4()),
+            description=description.strip(),
+            canonical_description=canonical_description.strip() or description.strip(),
+            unit=unit.strip(),
+            rate=float(rate),
+            source=source.strip() or "review_task",
+            reviewer=reviewer.strip(),
+            status=status.strip() or "approved",
+            metadata_json=json.dumps(metadata or {}, ensure_ascii=True),
+            created_at=utc_now_iso(),
+        )
+        with sqlite3.connect(self.path) as conn:
+            conn.execute(
+                """
+                INSERT INTO rate_observations (id, description, canonical_description, unit, rate, source, reviewer, status, metadata_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.description,
+                    record.canonical_description,
+                    record.unit,
+                    record.rate,
+                    record.source,
+                    record.reviewer,
+                    record.status,
+                    record.metadata_json,
+                    record.created_at,
+                ),
+            )
+        return record
+
+    def fetch_rate_observations(self) -> list[RateObservation]:
+        self.initialize()
+        with sqlite3.connect(self.path) as conn:
+            rows = conn.execute(
+                """
+                SELECT id, description, canonical_description, unit, rate, source, reviewer, status, metadata_json, created_at
+                FROM rate_observations
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        return [
+            RateObservation(
+                id=str(row[0]),
+                description=str(row[1]),
+                canonical_description=str(row[2]),
+                unit=str(row[3]),
+                rate=float(row[4]),
+                source=str(row[5]),
+                reviewer=str(row[6]),
+                status=str(row[7]),
+                metadata_json=str(row[8]),
+                created_at=str(row[9]),
+            )
+            for row in rows
+        ]
+
+    def record_candidate_review(
+        self,
+        description: str,
+        suggested_description: str,
+        unit: str,
+        *,
+        reason: str,
+        reviewer: str,
+        status: str = "pending",
+        metadata: dict[str, Any] | None = None,
+    ) -> CandidateReviewRecord:
+        self.initialize()
+        record = CandidateReviewRecord(
+            id=str(uuid4()),
+            description=description.strip(),
+            suggested_description=suggested_description.strip(),
+            unit=unit.strip(),
+            reason=reason.strip() or "review_required",
+            reviewer=reviewer.strip(),
+            status=status.strip() or "pending",
+            metadata_json=json.dumps(metadata or {}, ensure_ascii=True),
+            created_at=utc_now_iso(),
+        )
+        with sqlite3.connect(self.path) as conn:
+            conn.execute(
+                """
+                INSERT INTO candidate_review_records (id, description, suggested_description, unit, reason, reviewer, status, metadata_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.description,
+                    record.suggested_description,
+                    record.unit,
+                    record.reason,
+                    record.reviewer,
+                    record.status,
+                    record.metadata_json,
+                    record.created_at,
+                ),
+            )
+        return record
+
+    def fetch_candidate_reviews(self) -> list[CandidateReviewRecord]:
+        self.initialize()
+        with sqlite3.connect(self.path) as conn:
+            rows = conn.execute(
+                """
+                SELECT id, description, suggested_description, unit, reason, reviewer, status, metadata_json, created_at
+                FROM candidate_review_records
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        return [
+            CandidateReviewRecord(
+                id=str(row[0]),
+                description=str(row[1]),
+                suggested_description=str(row[2]),
+                unit=str(row[3]),
+                reason=str(row[4]),
+                reviewer=str(row[5]),
+                status=str(row[6]),
+                metadata_json=str(row[7]),
+                created_at=str(row[8]),
+            )
+            for row in rows
+        ]
+
+    def record_alias_suggestion(
+        self,
+        alias: str,
+        canonical_term: str,
+        *,
+        section_bias: str = "",
+        reviewer: str,
+        status: str = "pending",
+        metadata: dict[str, Any] | None = None,
+    ) -> AliasSuggestion:
+        self.initialize()
+        record = AliasSuggestion(
+            id=str(uuid4()),
+            alias=alias.strip(),
+            canonical_term=canonical_term.strip(),
+            section_bias=section_bias.strip(),
+            reviewer=reviewer.strip(),
+            status=status.strip() or "pending",
+            metadata_json=json.dumps(metadata or {}, ensure_ascii=True),
+            created_at=utc_now_iso(),
+        )
+        with sqlite3.connect(self.path) as conn:
+            conn.execute(
+                """
+                INSERT INTO alias_suggestions (id, alias, canonical_term, section_bias, reviewer, status, metadata_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.alias,
+                    record.canonical_term,
+                    record.section_bias,
+                    record.reviewer,
+                    record.status,
+                    record.metadata_json,
+                    record.created_at,
+                ),
+            )
+        return record
+
+    def fetch_alias_suggestions(self) -> list[AliasSuggestion]:
+        self.initialize()
+        with sqlite3.connect(self.path) as conn:
+            rows = conn.execute(
+                """
+                SELECT id, alias, canonical_term, section_bias, reviewer, status, metadata_json, created_at
+                FROM alias_suggestions
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        return [
+            AliasSuggestion(
+                id=str(row[0]),
+                alias=str(row[1]),
+                canonical_term=str(row[2]),
+                section_bias=str(row[3]),
+                reviewer=str(row[4]),
+                status=str(row[5]),
+                metadata_json=str(row[6]),
+                created_at=str(row[7]),
+            )
+            for row in rows
+        ]
 
     def export_to_excel(self, excel_path: str | Path) -> Path:
         self.initialize()

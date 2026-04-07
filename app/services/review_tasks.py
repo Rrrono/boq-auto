@@ -261,6 +261,8 @@ def _promotion_plan(task: ReviewTask, qa_status: str) -> tuple[str, str, str]:
     if qa_status == "approved":
         if submitted_decision == "confirm_match" and task.matched_item_code:
             return "match_feedback", "logged", "accepted"
+        if submitted_decision == "confirm_match" and task.submitted_match_description and task.submitted_match_description != task.matched_description:
+            return "alias_suggestion", "ready", ""
         if submitted_decision == "manual_rate":
             return "rate_observation", "ready", "rejected"
         if submitted_decision == "no_good_match":
@@ -291,6 +293,64 @@ def _log_feedback_if_possible(task: ReviewTask, feedback_action: str) -> datetim
     return datetime.now(timezone.utc)
 
 
+def _persist_promotion_artifact(task: ReviewTask, reviewer_email: str | None) -> str:
+    if task.promotion_status not in {"ready", "needs_attention"} or not task.promotion_target:
+        return task.promotion_status
+    schema_path = _resolve_schema_database_path()
+    if schema_path is None:
+        return task.promotion_status
+
+    repository = CostDatabase(schema_path)
+    reviewer = (reviewer_email or task.qa_reviewer_email or task.reviewer_email or "").strip()
+    metadata = {
+        "job_id": task.job_id,
+        "job_run_id": task.job_run_id,
+        "source_row_key": task.source_row_key,
+        "task_id": task.id,
+        "decision": task.submitted_decision,
+        "qa_status": task.qa_status,
+        "matched_item_code": task.matched_item_code,
+    }
+
+    if task.promotion_target == "rate_observation" and task.submitted_rate is not None:
+        repository.record_rate_observation(
+            task.description,
+            task.submitted_match_description or task.matched_description or task.description,
+            task.unit,
+            task.submitted_rate,
+            source="review_task",
+            reviewer=reviewer,
+            status="approved",
+            metadata=metadata,
+        )
+        return "logged"
+
+    if task.promotion_target == "candidate_review":
+        repository.record_candidate_review(
+            task.description,
+            task.submitted_match_description or task.matched_description,
+            task.unit,
+            reason=task.qa_note or task.reviewer_note or "review_required",
+            reviewer=reviewer,
+            status="pending",
+            metadata=metadata,
+        )
+        return "logged"
+
+    if task.promotion_target == "alias_suggestion":
+        repository.record_alias_suggestion(
+            task.description,
+            task.submitted_match_description,
+            section_bias="",
+            reviewer=reviewer,
+            status="pending",
+            metadata=metadata,
+        )
+        return "logged"
+
+    return task.promotion_status
+
+
 def qa_review_task(
     db: Session,
     task: ReviewTask,
@@ -312,6 +372,7 @@ def qa_review_task(
     now = datetime.now(timezone.utc)
     task.qa_updated_at = now
     task.feedback_logged_at = _log_feedback_if_possible(task, feedback_action)
+    task.promotion_status = _persist_promotion_artifact(task, reviewer_email or task.qa_reviewer_email)
     task.updated_at = now
     db.commit()
     db.refresh(task)

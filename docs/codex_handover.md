@@ -164,6 +164,10 @@ As of the latest tracked state in this repo:
   - QA outcomes now map to `promotion_target` / `promotion_status`
   - approved reviewer confirmations can feed match-feedback logging when a canonical item code exists
   - the hosted reviewer inbox now exposes promotion readiness and learning-hook status directly
+- approved reviewer outcomes can now create durable normalized-schema records:
+  - manual-rate approvals can persist `rate_observations`
+  - no-good-match / escalation style outcomes can persist `candidate_review_records`
+  - confirmed alternate phrasing can persist `alias_suggestions`
 - review tasks now support a first task-type framework:
   - each task carries `task_type`
   - each task carries an engine-generated `task_question`
@@ -202,7 +206,13 @@ Pulling alone does not update the live frontend or backend.
 
 Use the repo helper:
 
-- `bash scripts/deploy_all_cloudshell.sh`
+- default Cloud Shell redeploy sequence:
+
+```bash
+cd ~/boq-auto
+git pull
+bash scripts/deploy_all_cloudshell.sh
+```
 
 That single command:
 
@@ -304,7 +314,7 @@ Improve pricing quality, especially for weak/non-core categories:
 The current reviewer queue is intentionally MVP-level. The next best extensions are:
 
 - bulk actions for grouped weak items
-- promotion hooks from submitted review tasks into the existing review/promotion foundations
+- deeper promotion hooks from submitted review tasks into the existing review/promotion foundations
 - reviewer performance and workload summaries
 - clearer mapping between submitted task outcomes and `match_feedback` / promotion flows
 - richer task-type generation so more uncertainty modes become explicit reviewer questions instead of generic review prompts
@@ -313,7 +323,7 @@ The current reviewer queue is intentionally MVP-level. The next best extensions 
 
 The next active slice after this handover update is:
 
-1. turn `promotion_target` / `promotion_status` reviewer outcomes into real persistence flows for aliases, candidate review, and rate observations
+1. connect the new normalized reviewer artifacts back into the workbook-era review/promotion foundations cleanly
 2. keep the taxonomy slice backward-compatible with the current rate library and Excel flow
 3. preserve the review-first architecture without creating a separate moderation pipeline
 4. keep the darker hosted UI direction consistent across new pages and states
@@ -352,7 +362,7 @@ When improving quality, prefer extending these current seams:
 
 If handing over right now, the best immediate task is:
 
-1. turn `promotion_target` / `promotion_status` reviewer outcomes into real persistence flows for aliases, candidate review, and rate observations
+1. connect the new normalized reviewer artifacts (`rate_observations`, `candidate_review_records`, `alias_suggestions`) back into the workbook-era review/promotion foundations cleanly
 2. define the next canonical BOQ AUTO taxonomy slice beyond the initial inferred fields
 3. extend the schema so current flat items can map into domain / family / category / canonical item structure more explicitly
 4. keep matcher and reviewer UX aligned with that taxonomy, the darker hosted UI direction, and the new task-type question model
