@@ -152,6 +152,7 @@ Cloud Run deployment files:
 
 - [cloudbuild.yaml](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/cloudbuild.yaml)
 - [scripts/deploy_cloud_run.ps1](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/scripts/deploy_cloud_run.ps1)
+- [scripts/deploy_all_cloudshell.sh](C:/Users/Ronoz/Documents/BOSCO%20CONSULT/BOQ%20AUTO/scripts/deploy_all_cloudshell.sh)
 
 Example Windows deployment:
 
@@ -196,6 +197,27 @@ That deployment helper now:
 - attaches the Cloud SQL instance to the Cloud Run service
 - mounts the DB password into `BOQ_AUTO_DB_PASSWORD` from Secret Manager
 - optionally sets a dedicated Cloud Run service account
+
+For the hosted Cloud Shell workflow, use the one-command deploy helper:
+
+```bash
+cd ~/boq-auto
+bash scripts/deploy_all_cloudshell.sh
+```
+
+Optional overrides:
+
+```bash
+PROJECT_ID=your-project-id REGION=us-central1 bash scripts/deploy_all_cloudshell.sh
+```
+
+Useful toggles:
+
+```bash
+DEPLOY_FRONTEND=false bash scripts/deploy_all_cloudshell.sh
+DEPLOY_BACKEND=false bash scripts/deploy_all_cloudshell.sh
+RUN_CHECKS=false bash scripts/deploy_all_cloudshell.sh
+```
 
 ## Web Platform Slice
 

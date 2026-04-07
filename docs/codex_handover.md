@@ -183,6 +183,7 @@ Recent important commits:
 - `2e70630` Allow hosted frontend CORS on protected API routes
 - `d91fb78` Harden web workspace and enforce Firebase API auth
 - `6a92572` Fix hosted Firebase Auth configuration
+- repo deployment helper now exists at `scripts/deploy_all_cloudshell.sh` for one-command Cloud Shell milestone deploys
 
 ## Deployment Rules
 
@@ -196,6 +197,26 @@ This distinction matters:
   - `firebase deploy --only apphosting`
 
 Pulling alone does not update the live frontend or backend.
+
+### Standard Cloud Shell milestone deploy
+
+Use the repo helper:
+
+- `bash scripts/deploy_all_cloudshell.sh`
+
+That single command:
+
+- pulls latest source
+- builds the backend image
+- deploys Cloud Run with the expected env vars / secret wiring
+- deploys Firebase App Hosting
+- runs quick backend health/auth checks
+
+Useful toggles:
+
+- `DEPLOY_FRONTEND=false bash scripts/deploy_all_cloudshell.sh`
+- `DEPLOY_BACKEND=false bash scripts/deploy_all_cloudshell.sh`
+- `RUN_CHECKS=false bash scripts/deploy_all_cloudshell.sh`
 
 ### Backend runtime assumptions
 
@@ -298,6 +319,7 @@ The next active slice after this handover update is:
 4. keep the darker hosted UI direction consistent across new pages and states
 5. deepen task-type-driven reviewer questions so the engine can ask reviewers exactly what kind of decision is needed
 6. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
+7. keep `scripts/deploy_all_cloudshell.sh` updated whenever runtime env vars or deploy assumptions change
 
 ## Working Principles For The Next Codex
 
