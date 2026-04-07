@@ -97,6 +97,8 @@ def test_ingest_manual_to_database_updates_excel_and_schema(tmp_path) -> None:
     assert len(repository.fetch_items()) == 1
     assert len(repository.fetch_ingestion_logs()) >= 1
     assert repository.fetch_items()[0].keywords
+    assert repository.fetch_items()[0].domain
+    assert repository.fetch_items()[0].work_family
     assert alias_rows
 
 

@@ -44,8 +44,12 @@ class CostItem:
     description: str
     normalized_description: str
     unit: str
+    domain: str
+    work_family: str
     category: str
     subcategory: str
+    item_kind: str
+    project_context: str
     material: str
     keywords: list[str]
     rate: float
@@ -123,8 +127,12 @@ class CostDatabase:
                     description TEXT NOT NULL,
                     normalized_description TEXT NOT NULL,
                     unit TEXT NOT NULL,
+                    domain TEXT NOT NULL DEFAULT '',
+                    work_family TEXT NOT NULL DEFAULT '',
                     category TEXT NOT NULL,
                     subcategory TEXT NOT NULL,
+                    item_kind TEXT NOT NULL DEFAULT 'work_item',
+                    project_context TEXT NOT NULL DEFAULT '',
                     material TEXT NOT NULL DEFAULT '',
                     keywords TEXT NOT NULL DEFAULT '[]',
                     rate REAL NOT NULL,
@@ -180,8 +188,16 @@ class CostDatabase:
                 """
             )
             existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+            if "domain" not in existing_columns:
+                conn.execute("ALTER TABLE items ADD COLUMN domain TEXT NOT NULL DEFAULT ''")
+            if "work_family" not in existing_columns:
+                conn.execute("ALTER TABLE items ADD COLUMN work_family TEXT NOT NULL DEFAULT ''")
             if "material" not in existing_columns:
                 conn.execute("ALTER TABLE items ADD COLUMN material TEXT NOT NULL DEFAULT ''")
+            if "item_kind" not in existing_columns:
+                conn.execute("ALTER TABLE items ADD COLUMN item_kind TEXT NOT NULL DEFAULT 'work_item'")
+            if "project_context" not in existing_columns:
+                conn.execute("ALTER TABLE items ADD COLUMN project_context TEXT NOT NULL DEFAULT ''")
             if "keywords" not in existing_columns:
                 conn.execute("ALTER TABLE items ADD COLUMN keywords TEXT NOT NULL DEFAULT '[]'")
             feedback_columns = {row[1] for row in conn.execute("PRAGMA table_info(match_feedback)")}
@@ -243,8 +259,8 @@ class CostDatabase:
             for item in items:
                 conn.execute(
                     """
-                    INSERT INTO items (id, code, description, normalized_description, unit, category, subcategory, material, keywords, rate, source_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO items (id, code, description, normalized_description, unit, domain, work_family, category, subcategory, item_kind, project_context, material, keywords, rate, source_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         item.id,
@@ -252,8 +268,12 @@ class CostDatabase:
                         item.description,
                         item.normalized_description,
                         item.unit,
+                        item.domain,
+                        item.work_family,
                         item.category,
                         item.subcategory,
+                        item.item_kind,
+                        item.project_context,
                         item.material,
                         json.dumps(item.keywords, ensure_ascii=True),
                         item.rate,
@@ -289,7 +309,7 @@ class CostDatabase:
         with sqlite3.connect(self.path) as conn:
             rows = conn.execute(
                 """
-                SELECT id, code, description, normalized_description, unit, category, subcategory, material, keywords, rate, source_id, created_at
+                SELECT id, code, description, normalized_description, unit, domain, work_family, category, subcategory, item_kind, project_context, material, keywords, rate, source_id, created_at
                 FROM items
                 ORDER BY created_at DESC
                 """
@@ -301,13 +321,17 @@ class CostDatabase:
                 description=str(row[2]),
                 normalized_description=str(row[3]),
                 unit=str(row[4]),
-                category=str(row[5]),
-                subcategory=str(row[6]),
-                material=str(row[7]),
-                keywords=list(json.loads(row[8] or "[]")),
-                rate=float(row[9]),
-                source_id=str(row[10]),
-                created_at=str(row[11]),
+                domain=str(row[5]),
+                work_family=str(row[6]),
+                category=str(row[7]),
+                subcategory=str(row[8]),
+                item_kind=str(row[9]),
+                project_context=str(row[10]),
+                material=str(row[11]),
+                keywords=list(json.loads(row[12] or "[]")),
+                rate=float(row[13]),
+                source_id=str(row[14]),
+                created_at=str(row[15]),
             )
             for row in rows
         ]
@@ -493,7 +517,7 @@ class CostDatabase:
                     "alias_group": "",
                     "build_up_recipe_id": "",
                     "confidence_hint": 0.0,
-                    "notes": "",
+                    "notes": " | ".join(part for part in [item.domain, item.work_family, item.item_kind, item.project_context] if part),
                     "active": True,
                 },
             )
@@ -520,6 +544,12 @@ class CostDatabase:
             description = str(values.get("description") or "").strip()
             if not description:
                 continue
+            taxonomy = derive_taxonomy_fields(
+                description=description,
+                category=str(values.get("section") or ""),
+                subcategory=str(values.get("subsection") or ""),
+                material=str(values.get("material_type") or ""),
+            )
             items.append(
                 CostItem(
                     id=str(uuid4()),
@@ -527,8 +557,12 @@ class CostDatabase:
                     description=description,
                     normalized_description=normalize_text(str(values.get("normalized_description") or description)),
                     unit=normalize_unit(str(values.get("unit") or "")),
+                    domain=taxonomy["domain"],
+                    work_family=taxonomy["work_family"],
                     category=str(values.get("section") or ""),
                     subcategory=str(values.get("subsection") or ""),
+                    item_kind=taxonomy["item_kind"],
+                    project_context=taxonomy["project_context"],
                     material=str(values.get("material_type") or ""),
                     keywords=[value.strip() for value in str(values.get("keywords") or "").split(",") if value.strip()],
                     rate=safe_float(values.get("rate")) or 0.0,
@@ -551,15 +585,34 @@ def build_cost_item(
     keywords: list[str] | None,
     rate: float,
     source_id: str,
+    *,
+    domain: str = "",
+    work_family: str = "",
+    item_kind: str = "",
+    project_context: str = "",
 ) -> CostItem:
+    taxonomy = derive_taxonomy_fields(
+        description=description,
+        category=category,
+        subcategory=subcategory,
+        material=material,
+        domain=domain,
+        work_family=work_family,
+        item_kind=item_kind,
+        project_context=project_context,
+    )
     return CostItem(
         id=str(uuid4()),
         code=code.strip(),
         description=description.strip(),
         normalized_description=normalize_text(description),
         unit=normalize_unit(unit),
+        domain=taxonomy["domain"],
+        work_family=taxonomy["work_family"],
         category=category.strip(),
         subcategory=subcategory.strip(),
+        item_kind=taxonomy["item_kind"],
+        project_context=taxonomy["project_context"],
         material=material.strip(),
         keywords=list(keywords or []),
         rate=rate,
@@ -573,9 +626,136 @@ def composed_embedding_text(item: CostItem) -> str:
 
     return " | ".join(
         [
+            item.domain.strip(),
+            item.work_family.strip(),
             item.category.strip(),
+            item.item_kind.strip(),
+            item.project_context.strip(),
             item.material.strip(),
             item.description.strip(),
             item.unit.strip(),
         ]
     )
+
+
+DOMAIN_HINTS: dict[str, tuple[str, ...]] = {
+    "preliminaries": ("preliminar", "office", "ablution", "temporary", "starlink", "containerized"),
+    "structures": ("concrete", "reinforcement", "rebar", "formwork", "footing", "masonry"),
+    "roads": ("road", "grader", "roller", "bitumen", "pavement", "kerb", "furniture"),
+    "drainage_utilities": ("pipe", "culvert", "manhole", "drain", "sewer", "water supply"),
+    "electrical_lighting": ("electrical", "light", "lighting", "cable", "socket", "pole", "transformer"),
+    "survey": ("survey", "beacon", "leveling", "total station", "setting out", "theodolite"),
+    "lab_testing": ("laboratory", "lab", "testing", "cube test", "soil test"),
+    "plant_transport": ("plant", "excavator", "tipper", "truck", "roller", "grader", "dozer", "pump", "mixer"),
+    "accommodation_furnishings": ("furniture", "bed", "chair", "table", "housing", "wardrobe", "office equipment"),
+}
+
+WORK_FAMILY_HINTS: dict[str, tuple[str, ...]] = {
+    "earthworks": ("excavat", "fill", "backfill", "compaction", "soil", "hardcore"),
+    "concrete": ("concrete", "blinding", "reinforcement", "formwork", "footing"),
+    "plant": ("excavator", "tipper", "truck", "roller", "grader", "dozer", "pump", "mixer", "vibrator"),
+    "preliminaries": ("preliminar", "office", "temporary", "site establishment"),
+    "piping": ("pipe", "culvert", "manhole", "drain", "sewer"),
+    "roads": ("road", "bitumen", "pavement", "kerb", "furniture"),
+    "survey": ("survey", "beacon", "total station", "setting out"),
+    "lab_testing": ("laboratory", "lab", "testing"),
+    "electrical": ("electrical", "light", "lighting", "cable", "transformer", "pole"),
+}
+
+EQUIPMENT_HINTS: tuple[str, ...] = (
+    "excavator",
+    "tipper",
+    "truck",
+    "roller",
+    "grader",
+    "dozer",
+    "pump",
+    "mixer",
+    "compressor",
+    "vibrator",
+    "total station",
+    "theodolite",
+)
+
+
+def derive_taxonomy_fields(
+    *,
+    description: str,
+    category: str,
+    subcategory: str,
+    material: str,
+    domain: str = "",
+    work_family: str = "",
+    item_kind: str = "",
+    project_context: str = "",
+) -> dict[str, str]:
+    text = normalize_text(" ".join(part for part in [description, category, subcategory, material] if part))
+
+    resolved_domain = domain.strip()
+    if not resolved_domain:
+        for candidate, terms in DOMAIN_HINTS.items():
+            if any(term in text for term in terms):
+                resolved_domain = candidate
+                break
+
+    resolved_work_family = work_family.strip()
+    if not resolved_work_family:
+        normalized_category = normalize_text(category)
+        normalized_subcategory = normalize_text(subcategory)
+        for candidate, terms in WORK_FAMILY_HINTS.items():
+            if candidate == normalized_category or candidate == normalized_subcategory or any(term in text for term in terms):
+                resolved_work_family = candidate
+                break
+
+    if not resolved_domain:
+        if resolved_work_family in {"earthworks", "concrete"}:
+            resolved_domain = "civil_works"
+        elif resolved_work_family == "preliminaries":
+            resolved_domain = "preliminaries"
+        elif resolved_work_family == "piping":
+            resolved_domain = "drainage_utilities"
+        elif resolved_work_family == "electrical":
+            resolved_domain = "electrical_lighting"
+        elif resolved_work_family == "survey":
+            resolved_domain = "survey"
+        elif resolved_work_family == "lab_testing":
+            resolved_domain = "lab_testing"
+        elif resolved_work_family == "roads":
+            resolved_domain = "roads"
+        elif resolved_work_family == "plant":
+            resolved_domain = "plant_transport"
+
+    resolved_item_kind = item_kind.strip()
+    if not resolved_item_kind:
+        if any(term in text for term in EQUIPMENT_HINTS) or normalize_text(subcategory) == "plant":
+            resolved_item_kind = "equipment"
+        elif "service" in text or "testing" in text or "survey" in text:
+            resolved_item_kind = "service"
+        else:
+            resolved_item_kind = "work_item"
+
+    resolved_project_context = project_context.strip()
+    if not resolved_project_context:
+        if resolved_domain in {"roads", "plant_transport"}:
+            resolved_project_context = "roads"
+        elif resolved_domain == "structures":
+            resolved_project_context = "structures"
+        elif resolved_domain == "civil_works":
+            resolved_project_context = "civil_general"
+        elif resolved_domain == "drainage_utilities":
+            resolved_project_context = "water_utilities"
+        elif resolved_domain == "electrical_lighting":
+            resolved_project_context = "electrical_airfield"
+        elif resolved_domain in {"survey", "lab_testing"}:
+            resolved_project_context = "engineering_support"
+        elif resolved_domain == "accommodation_furnishings":
+            resolved_project_context = "temporary_facilities"
+        elif resolved_domain == "preliminaries":
+            resolved_project_context = "general_requirements"
+
+    return {
+        "domain": resolved_domain,
+        "work_family": resolved_work_family,
+        "item_kind": resolved_item_kind,
+        "project_context": resolved_project_context,
+    }

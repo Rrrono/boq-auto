@@ -157,6 +157,9 @@ As of the latest tracked state in this repo:
   - the queue supports shared scope and "my tasks only" scope
   - backend guardrails prevent one reviewer from submitting another reviewer's claimed task
   - submitted tasks can now move into QA states: `approved`, `rejected`, or `escalated`
+- the first taxonomy-compatible schema slice has started in `src/cost_schema.py`:
+  - normalized items now support `domain`, `work_family`, `item_kind`, and `project_context`
+  - these fields are inferred from current item descriptions / categories so the schema can evolve without breaking the Excel rate library flow
 
 Recent important commits:
 
@@ -268,10 +271,10 @@ The current reviewer queue is intentionally MVP-level. The next best extensions 
 
 The next active slice after this handover update is:
 
-1. connect approved/escalated review tasks to promotion and feedback hooks
-2. add bulk actions for grouped reviewer work
-3. preserve the review-first architecture without creating a separate moderation pipeline
-4. start converting the flat knowledge model toward the taxonomy strategy in `docs/taxonomy_strategy.md`
+1. finish validating the first taxonomy-compatible schema implementation in `src/cost_schema.py`
+2. keep it backward-compatible with the current rate library and Excel flow
+3. connect approved/escalated review tasks to promotion and feedback hooks after the first taxonomy slice lands
+4. preserve the review-first architecture without creating a separate moderation pipeline
 5. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
 
 ## Working Principles For The Next Codex
@@ -296,6 +299,9 @@ When improving quality, prefer extending these current seams:
 - `database/master/` is intentionally untracked and should not be committed casually
 - the normalized schema/feedback path exists, but hosted reviewer actions are not yet complete
 - some local Windows test runs may need explicit temp/cache handling under sandboxed environments
+- current taxonomy-slice verification status:
+  - taxonomy inference test passes: `tests/test_cost_schema.py::test_taxonomy_fields_are_inferred_for_equipment_and_utilities`
+  - full `tests/test_cost_schema.py tests/test_manual_ingestion_pipeline.py` coverage is partially blocked by Windows temp-directory permission issues in this environment, not by an observed schema logic failure
 - tender analysis and tender-to-pricing foundations are already substantial, but the hosted product has not fully absorbed them
 
 ## Recommended Next Work Slice

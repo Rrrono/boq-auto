@@ -3,7 +3,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from src.cost_schema import CostDatabase, build_cost_item, composed_embedding_text, schema_database_path
+from src.cost_schema import CostDatabase, build_cost_item, composed_embedding_text, derive_taxonomy_fields, schema_database_path
 
 
 def test_schema_creation_creates_expected_tables(tmp_path) -> None:
@@ -48,5 +48,29 @@ def test_insert_items_and_embeddings(tmp_path) -> None:
     feedback = repository.fetch_match_feedback()[0]
     assert feedback.selected_item_id == item.id
     assert feedback.action == "accepted"
-    assert composed_embedding_text(item) == "earthworks | soil | Excavation | m3"
+    assert composed_embedding_text(item) == "civil_works | earthworks | earthworks | work_item | civil_general | soil | Excavation | m3"
     assert repository.resolve_item_id("A1") == item.id
+
+
+def test_taxonomy_fields_are_inferred_for_equipment_and_utilities() -> None:
+    equipment = derive_taxonomy_fields(
+        description="Motor grader complete with hydraulic ripper or scarifier",
+        category="Earthworks",
+        subcategory="Plant",
+        material="",
+    )
+    utilities = derive_taxonomy_fields(
+        description="HDPE pipe 110 mm including fittings",
+        category="Plumbing",
+        subcategory="Pipework",
+        material="pipe",
+    )
+
+    assert equipment["domain"] == "roads"
+    assert equipment["work_family"] == "earthworks"
+    assert equipment["item_kind"] == "equipment"
+    assert equipment["project_context"] == "roads"
+
+    assert utilities["domain"] == "drainage_utilities"
+    assert utilities["work_family"] == "piping"
+    assert utilities["project_context"] == "water_utilities"
