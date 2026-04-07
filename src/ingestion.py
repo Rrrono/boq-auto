@@ -314,6 +314,220 @@ def set_candidate_defaults(sheet) -> None:
             sheet.cell(row_number, positions["promotion_status"]).value = "not_promoted"
 
 
+def _review_artifact_marker(metadata: dict[str, Any], fallback: str) -> str:
+    task_id = str(metadata.get("task_id") or "").strip()
+    return f"schema-task:{task_id or fallback}"
+
+
+def _artifact_candidate_status(record_type: str, record_status: str) -> str:
+    status = str(record_status or "").strip().lower()
+    if record_type in {"rate_observation", "alias_suggestion"}:
+        return "approved" if status in {"approved", "logged"} else "pending"
+    if status in {"approved", "logged"}:
+        return "pending"
+    return "pending"
+
+
+def sync_review_artifacts_to_candidate_matches(db_path: str, schema_path: str | None = None) -> ImportSummary:
+    """Materialize normalized reviewer artifacts back into CandidateMatches for the existing review flow."""
+    from .cost_schema import CostDatabase, schema_database_path
+
+    workbook = load_workbook(db_path)
+    candidate_sheet = ensure_sheet_headers(workbook, "CandidateMatches", CANDIDATE_MATCH_HEADERS)
+    set_candidate_defaults(candidate_sheet)
+    ensure_sheet_headers(workbook, "ReviewLog", REVIEW_LOG_HEADERS)
+
+    repository = CostDatabase(schema_path or schema_database_path(db_path))
+    summary = ImportSummary(target_sheet="CandidateMatches", source_file=str(schema_path or db_path))
+    existing_markers = {
+        str(values[2] or "").strip()
+        for values in candidate_sheet.iter_rows(min_row=2, values_only=True)
+        if str(values[2] or "").strip().startswith("schema-task:")
+    }
+
+    def append_candidate(record_type: str, payload: dict[str, Any]) -> None:
+        metadata = payload.pop("metadata")
+        marker = _review_artifact_marker(metadata, payload["record_id"])
+        if marker in existing_markers:
+            summary.skipped_duplicates += 1
+            return
+        payload["source_file"] = marker
+        append_row(candidate_sheet, CANDIDATE_MATCH_HEADERS, payload)
+        existing_markers.add(marker)
+        summary.appended += 1
+        write_review_log(
+            workbook,
+            {
+                "timestamp": payload.get("reviewed_at") or timestamp_now(),
+                "boq_file": db_path,
+                "sheet_name": "CandidateMatches",
+                "row_number": candidate_sheet.max_row,
+                "boq_description": str(payload.get("description") or ""),
+                "decision": f"schema-{record_type}-synced",
+                "matched_item_code": str(payload.get("matched_item_code") or payload.get("approved_item_code") or ""),
+                "matched_description": str(payload.get("approved_description") or payload.get("approved_canonical_term") or payload.get("description") or ""),
+                "confidence_score": safe_float(payload.get("confidence_hint")) or 0.0,
+                "reviewer_note": str(payload.get("reviewer_note") or "Synced from normalized reviewer artifact"),
+            },
+        )
+
+    for record in repository.fetch_rate_observations():
+        metadata = json.loads(record.metadata_json or "{}")
+        append_candidate(
+            "rate-observation",
+            {
+                "timestamp": record.created_at,
+                "import_batch_id": f"schema-sync-{record.created_at[:10]}",
+                "record_id": record.id,
+                "source_sheet": "rate_observations",
+                "target_sheet": "RateLibrary",
+                "item_code": str(metadata.get("approved_item_code") or metadata.get("item_code") or ""),
+                "description": record.description,
+                "normalized_description": normalize_text(record.description),
+                "section": str(metadata.get("section") or metadata.get("category") or ""),
+                "subsection": str(metadata.get("subsection") or ""),
+                "unit": normalize_unit(record.unit),
+                "rate": record.rate,
+                "currency": str(metadata.get("currency") or "KES"),
+                "region": normalize_region_name(str(metadata.get("region") or "")),
+                "source": record.source or "review_task",
+                "source_page": record.id,
+                "basis": "Approved reviewer rate observation",
+                "crew_type": str(metadata.get("crew_type") or ""),
+                "plant_type": str(metadata.get("plant_type") or ""),
+                "material_type": str(metadata.get("material_type") or ""),
+                "keywords": str(metadata.get("keywords") or ""),
+                "alias_group": str(metadata.get("alias_group") or ""),
+                "build_up_recipe_id": str(metadata.get("build_up_recipe_id") or ""),
+                "confidence_hint": safe_float(metadata.get("confidence_override")) or 90.0,
+                "notes": "Synced from normalized rate observation",
+                "active": True,
+                "duplicate_reason": "schema reviewer artifact",
+                "matched_item_code": str(metadata.get("matched_item_code") or ""),
+                "reviewer_status": _artifact_candidate_status("rate_observation", record.status),
+                "reviewer_name": record.reviewer,
+                "reviewed_at": record.created_at,
+                "review_decision": "manual_rate",
+                "promote_target": "ratelibrary",
+                "approved_item_code": str(metadata.get("approved_item_code") or metadata.get("item_code") or ""),
+                "approved_description": record.canonical_description,
+                "approved_rate": record.rate,
+                "approved_canonical_term": record.canonical_description,
+                "approved_section_bias": str(metadata.get("section") or ""),
+                "confidence_override": safe_float(metadata.get("confidence_override")) or 90.0,
+                "reviewer_note": str(metadata.get("reviewer_note") or "Approved reviewer rate observation"),
+                "promotion_status": "not_promoted",
+                "promoted_at": "",
+                "metadata": metadata,
+            },
+        )
+
+    for record in repository.fetch_alias_suggestions():
+        metadata = json.loads(record.metadata_json or "{}")
+        append_candidate(
+            "alias-suggestion",
+            {
+                "timestamp": record.created_at,
+                "import_batch_id": f"schema-sync-{record.created_at[:10]}",
+                "record_id": record.id,
+                "source_sheet": "alias_suggestions",
+                "target_sheet": "Aliases",
+                "item_code": str(metadata.get("approved_item_code") or ""),
+                "description": record.alias,
+                "normalized_description": normalize_text(record.alias),
+                "section": record.section_bias,
+                "subsection": "",
+                "unit": "",
+                "rate": "",
+                "currency": "KES",
+                "region": normalize_region_name(str(metadata.get("region") or "")),
+                "source": "review_task",
+                "source_page": record.id,
+                "basis": "Approved reviewer alias suggestion",
+                "crew_type": "",
+                "plant_type": "",
+                "material_type": "",
+                "keywords": str(metadata.get("keywords") or ""),
+                "alias_group": "",
+                "build_up_recipe_id": "",
+                "confidence_hint": safe_float(metadata.get("confidence_override")) or 85.0,
+                "notes": "Synced from normalized alias suggestion",
+                "active": True,
+                "duplicate_reason": "schema reviewer artifact",
+                "matched_item_code": str(metadata.get("matched_item_code") or ""),
+                "reviewer_status": _artifact_candidate_status("alias_suggestion", record.status),
+                "reviewer_name": record.reviewer,
+                "reviewed_at": record.created_at,
+                "review_decision": "alias_suggestion",
+                "promote_target": "aliases",
+                "approved_item_code": str(metadata.get("approved_item_code") or ""),
+                "approved_description": record.canonical_term,
+                "approved_rate": "",
+                "approved_canonical_term": record.canonical_term,
+                "approved_section_bias": record.section_bias,
+                "confidence_override": safe_float(metadata.get("confidence_override")) or 85.0,
+                "reviewer_note": str(metadata.get("reviewer_note") or "Approved reviewer alias suggestion"),
+                "promotion_status": "not_promoted",
+                "promoted_at": "",
+                "metadata": metadata,
+            },
+        )
+
+    for record in repository.fetch_candidate_reviews():
+        metadata = json.loads(record.metadata_json or "{}")
+        append_candidate(
+            "candidate-review",
+            {
+                "timestamp": record.created_at,
+                "import_batch_id": f"schema-sync-{record.created_at[:10]}",
+                "record_id": record.id,
+                "source_sheet": "candidate_review_records",
+                "target_sheet": "CandidateMatches",
+                "item_code": str(metadata.get("approved_item_code") or metadata.get("item_code") or ""),
+                "description": record.description,
+                "normalized_description": normalize_text(record.description),
+                "section": str(metadata.get("section") or metadata.get("category") or ""),
+                "subsection": str(metadata.get("subsection") or ""),
+                "unit": normalize_unit(record.unit),
+                "rate": "",
+                "currency": str(metadata.get("currency") or "KES"),
+                "region": normalize_region_name(str(metadata.get("region") or "")),
+                "source": "review_task",
+                "source_page": record.id,
+                "basis": "Reviewer escalation / no-good-match record",
+                "crew_type": str(metadata.get("crew_type") or ""),
+                "plant_type": str(metadata.get("plant_type") or ""),
+                "material_type": str(metadata.get("material_type") or ""),
+                "keywords": str(metadata.get("keywords") or ""),
+                "alias_group": "",
+                "build_up_recipe_id": "",
+                "confidence_hint": safe_float(metadata.get("confidence_override")) or 40.0,
+                "notes": f"Synced from normalized candidate review: {record.reason}",
+                "active": True,
+                "duplicate_reason": "schema reviewer artifact",
+                "matched_item_code": str(metadata.get("matched_item_code") or ""),
+                "reviewer_status": _artifact_candidate_status("candidate_review", record.status),
+                "reviewer_name": record.reviewer,
+                "reviewed_at": record.created_at,
+                "review_decision": record.reason or "hold",
+                "promote_target": "candidatematches",
+                "approved_item_code": "",
+                "approved_description": record.suggested_description,
+                "approved_rate": "",
+                "approved_canonical_term": record.suggested_description,
+                "approved_section_bias": str(metadata.get("section") or ""),
+                "confidence_override": safe_float(metadata.get("confidence_override")) or "",
+                "reviewer_note": str(metadata.get("reviewer_note") or record.reason or "Needs workbook review"),
+                "promotion_status": "not_promoted",
+                "promoted_at": "",
+                "metadata": metadata,
+            },
+        )
+
+    workbook.save(db_path)
+    return summary
+
+
 def import_structured_rows(
     db_path: str,
     input_path: str,

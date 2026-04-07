@@ -88,6 +88,11 @@ def build_parser() -> argparse.ArgumentParser:
     promote.add_argument("--db", required=True, help="Path to database workbook")
     promote.add_argument("--json", help="Optional training log JSON output")
 
+    sync_review_artifacts = subparsers.add_parser("sync-review-artifacts", help="Sync normalized reviewer artifacts into CandidateMatches")
+    sync_review_artifacts.add_argument("--db", required=True, help="Path to database workbook")
+    sync_review_artifacts.add_argument("--schema", help="Optional explicit normalized schema SQLite path")
+    sync_review_artifacts.add_argument("--refresh-review-report", action="store_true", help="Regenerate Candidate Review after syncing artifacts")
+
     analyze_tender = subparsers.add_parser("analyze-tender", help="Analyze a tender text input and generate a review workbook")
     analyze_tender.add_argument("--input", required=True, help="Path to local tender text, PDF, CSV, or Excel input")
     analyze_tender.add_argument("--out", required=True, help="Output workbook path")

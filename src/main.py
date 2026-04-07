@@ -20,6 +20,7 @@ from .ingestion import (
     merge_reviewed_candidates,
     normalize_database_units,
     promote_approved_candidates,
+    sync_review_artifacts_to_candidate_matches,
 )
 from .logger import setup_logging
 from .tender_to_price import TenderToPriceRunner
@@ -255,6 +256,17 @@ def main() -> int:
     if args.command == "promote-approved":
         summary = promote_approved_candidates(args.db, args.json)
         logger.info("Promoted %s approved reviewed row(s).", summary.promoted)
+        return 0
+    if args.command == "sync-review-artifacts":
+        summary = sync_review_artifacts_to_candidate_matches(args.db, args.schema)
+        logger.info(
+            "Synced %s normalized reviewer artifact(s) into CandidateMatches (%s duplicate marker(s) skipped).",
+            summary.appended,
+            summary.skipped_duplicates,
+        )
+        if args.refresh_review_report:
+            report_summary = generate_review_report(args.db)
+            logger.info("Refreshed Candidate Review sheet with %s row(s).", report_summary.report_rows)
         return 0
     if args.command == "analyze-tender":
         workflow = TenderWorkflow(config, logger)

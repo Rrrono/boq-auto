@@ -168,6 +168,20 @@ As of the latest tracked state in this repo:
   - manual-rate approvals can persist `rate_observations`
   - no-good-match / escalation style outcomes can persist `candidate_review_records`
   - confirmed alternate phrasing can persist `alias_suggestions`
+- the immediate bridge priority is to sync those normalized reviewer artifacts back into workbook-era `CandidateMatches`
+  - the workbook review and promotion commands should remain the canonical promotion path
+  - normalized reviewer artifacts should feed that path, not replace it
+  - the intended operator flow is:
+    1. reviewer task is approved in the hosted platform
+    2. normalized artifact is written to the SQLite sidecar
+    3. a sync step materializes it into `CandidateMatches`
+    4. existing `review-report`, `merge-reviewed`, and `promote-approved` commands continue from there
+- that bridge now exists:
+  - `sync-review-artifacts` was added to the CLI
+  - approved `rate_observations` sync in as already-approved `ratelibrary` promotion rows
+  - approved `alias_suggestions` sync in as already-approved `aliases` promotion rows
+  - `candidate_review_records` sync in as pending `candidatematches` rows for further workbook review
+  - dedupe is driven by `schema-task:<task_id>` markers in `CandidateMatches.source_file`
 - review tasks now support a first task-type framework:
   - each task carries `task_type`
   - each task carries an engine-generated `task_question`
@@ -188,6 +202,20 @@ Recent important commits:
 - `d91fb78` Harden web workspace and enforce Firebase API auth
 - `6a92572` Fix hosted Firebase Auth configuration
 - repo deployment helper now exists at `scripts/deploy_all_cloudshell.sh` for one-command Cloud Shell milestone deploys
+
+Recent uncommitted work in the current checkpoint:
+
+- normalized reviewer artifacts now bridge back into workbook-era promotion flow via:
+  - `python -m src.main sync-review-artifacts --db <workbook.xlsx>`
+  - optional `--schema <path.sqlite>`
+  - optional `--refresh-review-report`
+- this keeps the review loop unified:
+  - hosted reviewer task approval writes normalized artifacts
+  - `sync-review-artifacts` materializes them into `CandidateMatches`
+  - existing workbook review/promotion commands can continue from there
+- focused verification status for this checkpoint:
+  - direct runtime smoke check passed for sync, dedupe, and promotion behavior
+  - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
 
 ## Deployment Rules
 
