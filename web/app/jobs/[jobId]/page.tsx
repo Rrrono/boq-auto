@@ -8,10 +8,13 @@ import { useAuth } from "../../../components/auth-provider";
 import {
   type Job,
   type PricingResult,
+  type ReviewTask,
   getErrorMessage,
   getJob,
   getJobResults,
+  listReviewTasks,
   priceJob,
+  syncReviewTasks,
   uploadJobFile,
 } from "../../../lib/platform-api";
 
@@ -36,6 +39,8 @@ export default function JobDetailPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pricingRunBusy, setPricingRunBusy] = useState(false);
+  const [reviewTasks, setReviewTasks] = useState<ReviewTask[]>([]);
+  const [syncingTasks, setSyncingTasks] = useState(false);
 
   useEffect(() => {
     if (loading || (configured && !user) || !jobId) {
@@ -53,14 +58,17 @@ export default function JobDetailPage() {
           getJob(jobId, token),
           getJobResults(jobId, token).catch(() => null),
         ]);
+        const nextTasks = await listReviewTasks({}, token).then((items) => items.filter((item) => item.job_id === jobId));
         if (!cancelled) {
           setJob(nextJob);
           setPricing(nextPricing);
+          setReviewTasks(nextTasks);
         }
       } catch (error) {
         if (!cancelled) {
           setJob(null);
           setPricing(null);
+          setReviewTasks([]);
           setWorkspaceError(getErrorMessage(error, "This job workspace could not be loaded right now."));
         }
       } finally {
@@ -133,11 +141,14 @@ export default function JobDetailPage() {
         getJob(jobId, token),
         getJobResults(jobId, token).catch(() => null),
       ]);
+      const nextTasks = await listReviewTasks({}, token).then((items) => items.filter((item) => item.job_id === jobId));
       setJob(nextJob);
       setPricing(nextPricing);
+      setReviewTasks(nextTasks);
     } catch (error) {
       setJob(null);
       setPricing(null);
+      setReviewTasks([]);
       setWorkspaceError(getErrorMessage(error, "The workspace could not be refreshed after that action."));
     } finally {
       setLoadingWorkspace(false);
@@ -187,6 +198,29 @@ export default function JobDetailPage() {
       setActionError(getErrorMessage(error, "Pricing could not start for this job."));
     } finally {
       setPricingRunBusy(false);
+    }
+  }
+
+  async function onSyncReviewTasks() {
+    if (!jobId) {
+      return;
+    }
+    setSyncingTasks(true);
+    setActionError("");
+    setNotice("");
+    try {
+      const token = await getIdToken();
+      const response = await syncReviewTasks(jobId, token);
+      setReviewTasks(response.tasks);
+      setNotice(
+        response.synced_count > 0
+          ? `Created or refreshed ${response.synced_count} review tasks from the latest pricing run.`
+          : "No review tasks were generated from the latest run.",
+      );
+    } catch (error) {
+      setActionError(getErrorMessage(error, "Review tasks could not be generated for this job."));
+    } finally {
+      setSyncingTasks(false);
     }
   }
 
@@ -391,6 +425,58 @@ export default function JobDetailPage() {
         ) : (
           <div className="emptyState">No runs yet. This panel will show the latest workbook and audit artifact URIs.</div>
         )}
+      </section>
+
+      <section className="card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <span className="pill">Reviewer Tasks</span>
+            <h3>Turn weak rows into structured review work</h3>
+          </div>
+          <div className="inlineActions">
+            <button type="button" onClick={() => void onSyncReviewTasks()} disabled={!pricing || syncingTasks}>
+              {syncingTasks ? "Syncing tasks..." : "Generate review tasks"}
+            </button>
+            <Link className="secondaryButton" href="/review-tasks">
+              Open reviewer inbox
+            </Link>
+          </div>
+        </div>
+        {!pricing ? (
+          <div className="emptyState">Run pricing first, then generate review tasks from the flagged and unmatched rows.</div>
+        ) : reviewTasks.length === 0 ? (
+          <div className="emptyState">No review tasks synced for this job yet.</div>
+        ) : (
+          <div className="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Row</th>
+                  <th>Description</th>
+                  <th>Status</th>
+                  <th>Confidence</th>
+                  <th>Reviewer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviewTasks.slice(0, 10).map((task) => (
+                  <tr key={task.id}>
+                    <td>{task.sheet_name || "Sheet"}:{task.row_number}</td>
+                    <td>{task.description}</td>
+                    <td><span className="statusPill">{task.status}</span></td>
+                    <td>
+                      <span className={`confidenceBadge confidence-${task.confidence_band}`}>{task.confidence_band}</span>
+                    </td>
+                    <td>{task.reviewer_email || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="helperText">
+          This queue is the bridge to the next learning phase: reviewers claim uncertain rows, submit structured corrections, and feed a future promotion workflow.
+        </p>
       </section>
 
       <section className="card">

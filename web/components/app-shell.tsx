@@ -12,6 +12,7 @@ const navItems: Array<{ href: Route; label: string }> = [
   { href: "/jobs/new", label: "New Job" },
   { href: "/price-checker", label: "Price Checker" },
   { href: "/knowledge-review", label: "Knowledge Review" },
+  { href: "/review-tasks", label: "Review Tasks" },
 ];
 
 

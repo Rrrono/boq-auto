@@ -110,3 +110,50 @@ def test_price_check_and_knowledge_queue() -> None:
         assert "generic_match_flag" in first_candidate
         assert "category_mismatch_flag" in first_candidate
         assert "section_mismatch_flag" in first_candidate
+
+
+def test_sync_claim_and_submit_review_tasks() -> None:
+    create_response = client.post("/jobs", json={"title": "Reviewer Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    upload_response = client.post(
+        f"/jobs/{job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("sample.xlsx", _build_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert upload_response.status_code == 200
+
+    price_response = client.post(f"/jobs/{job_id}/price-boq")
+    assert price_response.status_code == 200
+
+    sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    assert sync_response.status_code == 200
+    sync_body = sync_response.json()
+    assert sync_body["job_id"] == job_id
+    assert "tasks" in sync_body
+
+    tasks_response = client.get("/review-tasks")
+    assert tasks_response.status_code == 200
+    tasks = tasks_response.json()
+    assert len(tasks) >= 1
+
+    first_task = tasks[0]
+    claim_response = client.post(f"/review-tasks/{first_task['id']}/claim")
+    assert claim_response.status_code == 200
+    claimed = claim_response.json()
+    assert claimed["status"] == "claimed"
+
+    submit_response = client.post(
+        f"/review-tasks/{first_task['id']}/submit",
+        json={
+            "decision": "manual_rate",
+            "matched_description": "Manual review item",
+            "rate": 1250.0,
+            "reviewer_note": "Reviewed for marketplace workflow smoke test.",
+        },
+    )
+    assert submit_response.status_code == 200
+    submitted = submit_response.json()
+    assert submitted["status"] == "submitted"
+    assert submitted["submitted_decision"] == "manual_rate"
+    assert submitted["submitted_rate"] == 1250.0

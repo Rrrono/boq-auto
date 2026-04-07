@@ -120,6 +120,39 @@ export type KnowledgeQueueResponse = {
   candidates: KnowledgeCandidate[];
 };
 
+export type ReviewTask = {
+  id: number;
+  job_id: string;
+  job_run_id: number;
+  status: string;
+  source_row_key: string;
+  sheet_name: string;
+  row_number: number;
+  description: string;
+  matched_description: string;
+  unit: string;
+  decision: string;
+  confidence_score: number;
+  confidence_band: string;
+  flag_reasons: string[];
+  reviewer_uid: string;
+  reviewer_email: string;
+  submitted_decision: string;
+  submitted_match_description: string;
+  submitted_rate: number | null;
+  reviewer_note: string;
+  submitted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReviewTaskSyncResponse = {
+  job_id: string;
+  synced_count: number;
+  open_count: number;
+  tasks: ReviewTask[];
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -226,4 +259,46 @@ export async function priceCheck(query = "", limit = 50, token?: string | null):
 
 export async function getKnowledgeQueue(limit = 50, token?: string | null): Promise<KnowledgeQueueResponse> {
   return apiFetch<KnowledgeQueueResponse>(`/knowledge/candidates?limit=${limit}`, { token });
+}
+
+export async function listReviewTasks(
+  options?: { status?: string; mine?: boolean },
+  token?: string | null,
+): Promise<ReviewTask[]> {
+  const params = new URLSearchParams();
+  if (options?.status) {
+    params.set("status", options.status);
+  }
+  if (options?.mine) {
+    params.set("mine", "true");
+  }
+  const query = params.toString();
+  return apiFetch<ReviewTask[]>(`/review-tasks${query ? `?${query}` : ""}`, { token });
+}
+
+export async function syncReviewTasks(jobId: string, token?: string | null): Promise<ReviewTaskSyncResponse> {
+  return apiFetch<ReviewTaskSyncResponse>(`/jobs/${jobId}/review-tasks/sync`, {
+    token,
+    method: "POST",
+  });
+}
+
+export async function claimReviewTask(taskId: number, token?: string | null): Promise<ReviewTask> {
+  return apiFetch<ReviewTask>(`/review-tasks/${taskId}/claim`, {
+    token,
+    method: "POST",
+  });
+}
+
+export async function submitReviewTask(
+  taskId: number,
+  payload: { decision: string; matched_description: string; rate: number | null; reviewer_note: string },
+  token?: string | null,
+): Promise<ReviewTask> {
+  return apiFetch<ReviewTask>(`/review-tasks/${taskId}/submit`, {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }

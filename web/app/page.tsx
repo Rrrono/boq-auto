@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "../components/auth-provider";
-import { type Job, getErrorMessage, listJobs } from "../lib/platform-api";
+import { type Job, getErrorMessage, listJobs, listReviewTasks } from "../lib/platform-api";
 
 const cards = [
   {
@@ -24,6 +24,7 @@ const cards = [
 export default function HomePage() {
   const { configured, loading, user, getIdToken } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [reviewTaskCount, setReviewTaskCount] = useState<number | null>(null);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobsError, setJobsError] = useState("");
 
@@ -39,13 +40,15 @@ export default function HomePage() {
       setJobsError("");
       try {
         const token = await getIdToken();
-        const nextJobs = await listJobs(token);
+        const [nextJobs, nextTasks] = await Promise.all([listJobs(token), listReviewTasks({ status: "open" }, token)]);
         if (!cancelled) {
           setJobs(nextJobs);
+          setReviewTaskCount(nextTasks.length);
         }
       } catch (error) {
         if (!cancelled) {
           setJobs([]);
+          setReviewTaskCount(null);
           setJobsError(getErrorMessage(error, "The dashboard could not load jobs right now."));
         }
       } finally {
@@ -111,6 +114,10 @@ export default function HomePage() {
         <div className="metaRow">
           <strong>Latest run</strong>
           <span>{loadingJobs ? "Loading..." : latestRun ? new Date(latestRun.created_at).toLocaleString() : "No runs yet"}</span>
+        </div>
+        <div className="metaRow">
+          <strong>Open review tasks</strong>
+          <span>{loadingJobs ? "Loading..." : reviewTaskCount ?? "-"}</span>
         </div>
       </section>
       <section className="card">

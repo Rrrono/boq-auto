@@ -27,6 +27,7 @@ class Job(Base):
 
     files: Mapped[list["JobFile"]] = relationship(back_populates="job", cascade="all, delete-orphan")
     runs: Mapped[list["JobRun"]] = relationship(back_populates="job", cascade="all, delete-orphan")
+    review_tasks: Mapped[list["ReviewTask"]] = relationship(back_populates="job", cascade="all, delete-orphan")
 
 
 class JobFile(Base):
@@ -61,3 +62,35 @@ class JobRun(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     job: Mapped[Job] = relationship(back_populates="runs")
+    review_tasks: Mapped[list["ReviewTask"]] = relationship(back_populates="job_run", cascade="all, delete-orphan")
+
+
+class ReviewTask(Base):
+    __tablename__ = "review_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), nullable=False, index=True)
+    job_run_id: Mapped[int] = mapped_column(ForeignKey("job_runs.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="open", nullable=False, index=True)
+    source_row_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    sheet_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    row_number: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    matched_description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    unit: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    decision: Mapped[str] = mapped_column(String(32), default="review", nullable=False)
+    confidence_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    confidence_band: Mapped[str] = mapped_column(String(32), default="very_low", nullable=False)
+    flag_reasons_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    reviewer_uid: Mapped[str] = mapped_column(String(128), default="", nullable=False)
+    reviewer_email: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    submitted_decision: Mapped[str] = mapped_column(String(32), default="", nullable=False)
+    submitted_match_description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    submitted_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reviewer_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+    job: Mapped[Job] = relationship(back_populates="review_tasks")
+    job_run: Mapped[JobRun] = relationship(back_populates="review_tasks")

@@ -51,3 +51,43 @@ class JobResponse(BaseModel):
 class JobPricingResponse(BaseModel):
     job: JobResponse
     pricing: BoqProcessingResponse
+
+
+class ReviewTaskResponse(BaseModel):
+    id: int
+    job_id: str
+    job_run_id: int
+    status: str
+    source_row_key: str
+    sheet_name: str
+    row_number: int
+    description: str
+    matched_description: str
+    unit: str
+    decision: str
+    confidence_score: float
+    confidence_band: str
+    flag_reasons: list[str] = Field(default_factory=list)
+    reviewer_uid: str = ""
+    reviewer_email: str = ""
+    submitted_decision: str = ""
+    submitted_match_description: str = ""
+    submitted_rate: float | None = None
+    reviewer_note: str = ""
+    submitted_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ReviewTaskSyncResponse(BaseModel):
+    job_id: str
+    synced_count: int
+    open_count: int
+    tasks: list[ReviewTaskResponse] = Field(default_factory=list)
+
+
+class ReviewTaskSubmissionRequest(BaseModel):
+    decision: str = Field(min_length=1, max_length=32)
+    matched_description: str = Field(default="", max_length=2000)
+    rate: float | None = None
+    reviewer_note: str = Field(default="", max_length=4000)
