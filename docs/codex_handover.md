@@ -209,6 +209,27 @@ Cloud SQL-backed web platform/API deployment depends on:
 
 ## Current Priorities
 
+### Research-backed architecture note
+
+There is now a strong repo-grounded case for a taxonomy-first knowledge model.
+
+Why:
+
+- actual BOQs in the repo already span domains like preliminaries, dayworks plant, earthworks, excavation, road furniture, elevated approach lighting, survey equipment, laboratory equipment, and engineer accommodation
+- the current rate library is still much narrower and is dominated by Earthworks / Dayworks / Concrete
+- current normalized schema fields (`category`, `subcategory`, `material`, `keywords`) are useful but too flat for the range of project types already visible
+
+See:
+
+- `docs/taxonomy_strategy.md`
+
+This means the next major knowledge-layer improvement should not be only matcher tuning. It should be:
+
+1. define a canonical construction taxonomy
+2. map current items and aliases into it
+3. treat price observations as data attached to canonical items, not as the only source of structure
+4. let future reviewer promotions feed canonical items / aliases / observations cleanly
+
 ### Immediate product priority
 
 Improve pricing quality, especially for weak/non-core categories:
@@ -232,6 +253,7 @@ Improve pricing quality, especially for weak/non-core categories:
 2. improve review queue usefulness and triage UX
 3. identify top missing knowledge clusters from real bad runs
 4. extend hosted reviewer action workflows so submitted tasks can feed promotions and learning
+5. begin taxonomy-first schema design for domains such as roads, structures, water/pipes, plant, survey, lab/testing, and accommodation/furniture
 
 ### Immediate reviewer-workflow follow-up
 
@@ -249,7 +271,8 @@ The next active slice after this handover update is:
 1. connect approved/escalated review tasks to promotion and feedback hooks
 2. add bulk actions for grouped reviewer work
 3. preserve the review-first architecture without creating a separate moderation pipeline
-4. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
+4. start converting the flat knowledge model toward the taxonomy strategy in `docs/taxonomy_strategy.md`
+5. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
 
 ## Working Principles For The Next Codex
 
@@ -279,10 +302,10 @@ When improving quality, prefer extending these current seams:
 
 If handing over right now, the best immediate task is:
 
-1. inspect the latest poor pricing runs
-2. classify dominant bad-match patterns
-3. harden matcher/category/section guardrails
-4. make knowledge review/workspace triage clearer
-5. prepare for reviewer action and promotion workflows
+1. connect reviewer QA outcomes to promotion/feedback hooks
+2. define the first canonical BOQ AUTO taxonomy slice
+3. extend the schema so current flat items can map into domain / family / category / canonical item structure
+4. keep matcher and reviewer UX aligned with that taxonomy
+5. only then continue deeper matcher tuning against the improved knowledge structure
 
 That continues the current product direction without wasting the architecture already built.
