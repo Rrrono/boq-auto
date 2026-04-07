@@ -29,10 +29,62 @@ def _should_create_task(item: dict) -> bool:
     return decision in {"review", "unmatched"} or review_flag
 
 
+def _response_schema(*choices: str) -> list[str]:
+    return [choice for choice in choices if choice]
+
+
+def _task_blueprint(item: dict) -> tuple[str, str, list[str]]:
+    decision = str(item.get("decision") or "").strip().lower()
+    description = str(item.get("description") or "").strip() or "this BOQ line"
+    unit = str(item.get("unit") or "").strip()
+    matched_description = str(item.get("matched_description") or "").strip()
+    confidence_band = str(item.get("confidence_band") or "very_low").strip().lower()
+    flag_reasons = [str(reason).strip().lower() for reason in item.get("flag_reasons") or [] if str(reason).strip()]
+    category_mismatch = bool(item.get("category_mismatch_flag") or False)
+    section_mismatch = bool(item.get("section_mismatch_flag") or False)
+
+    if decision == "unmatched":
+        return (
+            "manual_rate_entry",
+            f"No acceptable library match was found for '{description}'. Enter a practical rate for {unit or 'the required unit'} or confirm that the item should remain unmatched.",
+            _response_schema("manual_rate", "no_good_match", "reviewer_note"),
+        )
+
+    if category_mismatch or any("category" in reason for reason in flag_reasons):
+        return (
+            "category_classification",
+            f"The engine suspects a category mismatch for '{description}'. Decide whether the current match belongs to the right work family or describe the correct category direction.",
+            _response_schema("confirm_match", "no_good_match", "matched_description", "reviewer_note"),
+        )
+
+    if section_mismatch or any("section" in reason for reason in flag_reasons):
+        return (
+            "section_alignment",
+            f"The row '{description}' may belong to a different section than the current suggestion. Confirm the match only if the section context is still valid.",
+            _response_schema("confirm_match", "no_good_match", "matched_description", "reviewer_note"),
+        )
+
+    if not matched_description or confidence_band in {"very_low", "low"}:
+        return (
+            "candidate_selection",
+            f"Review the weak match for '{description}' and decide whether to keep the current suggestion or replace it with a better description/rate.",
+            _response_schema("confirm_match", "manual_rate", "no_good_match", "matched_description", "reviewer_note"),
+        )
+
+    return (
+        "match_confirmation",
+        f"Confirm whether '{matched_description}' is an acceptable match for '{description}' in {unit or 'the stated'} unit.",
+        _response_schema("confirm_match", "manual_rate", "no_good_match", "reviewer_note"),
+    )
+
+
 def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
     flag_reasons = json.loads(task.flag_reasons_json or "[]")
     if not isinstance(flag_reasons, list):
         flag_reasons = []
+    response_schema = json.loads(task.response_schema_json or "[]")
+    if not isinstance(response_schema, list):
+        response_schema = []
     return ReviewTaskResponse(
         id=task.id,
         job_id=task.job_id,
@@ -44,6 +96,9 @@ def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
         description=task.description,
         matched_description=task.matched_description,
         matched_item_code=task.matched_item_code,
+        task_type=task.task_type,
+        task_question=task.task_question,
+        response_schema=[str(value) for value in response_schema],
         unit=task.unit,
         decision=task.decision,
         confidence_score=task.confidence_score,
@@ -106,6 +161,8 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
         task.description = str(item.get("description") or "")
         task.matched_description = str(item.get("matched_description") or "")
         task.matched_item_code = str(item.get("matched_item_code") or "")
+        task.task_type, task.task_question, response_schema = _task_blueprint(item)
+        task.response_schema_json = json.dumps(response_schema, ensure_ascii=True)
         task.unit = str(item.get("unit") or "")
         task.decision = str(item.get("decision") or "review")
         task.confidence_score = float(item.get("confidence_score") or 0.0)

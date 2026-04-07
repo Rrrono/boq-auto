@@ -294,6 +294,10 @@ export default function ReviewTasksPage() {
 
                   <div className="metaGrid">
                     <div className="metaRow">
+                      <strong>Task type</strong>
+                      <span>{task.task_type.replaceAll("_", " ")}</span>
+                    </div>
+                    <div className="metaRow">
                       <strong>Engine decision</strong>
                       <span>{task.decision}</span>
                     </div>
@@ -321,6 +325,20 @@ export default function ReviewTasksPage() {
                       <strong>Promotion</strong>
                       <span>{task.promotion_target ? `${task.promotion_target} - ${task.promotion_status}` : task.promotion_status}</span>
                     </div>
+                  </div>
+
+                  <div className="card" style={{ marginTop: 14 }}>
+                    <span className="pill">Reviewer brief</span>
+                    <p className="helperText" style={{ marginTop: 8 }}>{task.task_question}</p>
+                    {task.response_schema.length > 0 ? (
+                      <div className="reasonList" style={{ marginTop: 10 }}>
+                        {task.response_schema.map((field) => (
+                          <span key={field} className="reasonBadge">
+                            {formatReason(field)}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
 
                   {task.flag_reasons.length > 0 ? (

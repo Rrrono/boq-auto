@@ -164,7 +164,16 @@ As of the latest tracked state in this repo:
   - QA outcomes now map to `promotion_target` / `promotion_status`
   - approved reviewer confirmations can feed match-feedback logging when a canonical item code exists
   - the hosted reviewer inbox now exposes promotion readiness and learning-hook status directly
+- review tasks now support a first task-type framework:
+  - each task carries `task_type`
+  - each task carries an engine-generated `task_question`
+  - each task carries a lightweight `response_schema` so the reviewer knows the expected answer shape
+  - weak rows can now be framed as concrete reviewer prompts such as manual-rate entry, candidate selection, or category/section checks
 - the web UI now uses a darker operations-style theme so the hosted platform feels more deliberate and less prototype-like
+- the immediate next slice is to turn weak rows into typed reviewer questions:
+  - each review task should carry a `task_type`
+  - the engine should generate a concrete reviewer question instead of a generic review request
+  - reviewer tasks should describe the expected response shape so the future marketplace flow can scale
 
 Recent important commits:
 
@@ -277,6 +286,7 @@ The current reviewer queue is intentionally MVP-level. The next best extensions 
 - promotion hooks from submitted review tasks into the existing review/promotion foundations
 - reviewer performance and workload summaries
 - clearer mapping between submitted task outcomes and `match_feedback` / promotion flows
+- richer task-type generation so more uncertainty modes become explicit reviewer questions instead of generic review prompts
 
 ### Current in-flight direction
 
@@ -286,7 +296,8 @@ The next active slice after this handover update is:
 2. keep the taxonomy slice backward-compatible with the current rate library and Excel flow
 3. preserve the review-first architecture without creating a separate moderation pipeline
 4. keep the darker hosted UI direction consistent across new pages and states
-5. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
+5. deepen task-type-driven reviewer questions so the engine can ask reviewers exactly what kind of decision is needed
+6. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
 
 ## Working Principles For The Next Codex
 
@@ -322,7 +333,7 @@ If handing over right now, the best immediate task is:
 1. turn `promotion_target` / `promotion_status` reviewer outcomes into real persistence flows for aliases, candidate review, and rate observations
 2. define the next canonical BOQ AUTO taxonomy slice beyond the initial inferred fields
 3. extend the schema so current flat items can map into domain / family / category / canonical item structure more explicitly
-4. keep matcher and reviewer UX aligned with that taxonomy and the darker hosted UI direction
+4. keep matcher and reviewer UX aligned with that taxonomy, the darker hosted UI direction, and the new task-type question model
 5. only then continue deeper matcher tuning against the improved knowledge structure
 
 That continues the current product direction without wasting the architecture already built.

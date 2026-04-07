@@ -40,6 +40,9 @@ def _ensure_review_task_columns() -> None:
     existing_columns = {column["name"] for column in inspector.get_columns("review_tasks")}
     column_definitions = {
         "matched_item_code": "VARCHAR(128) NOT NULL DEFAULT ''",
+        "task_type": "VARCHAR(64) NOT NULL DEFAULT 'match_confirmation'",
+        "task_question": "TEXT NOT NULL DEFAULT ''",
+        "response_schema_json": "TEXT NOT NULL DEFAULT '[]'",
         "promotion_target": "VARCHAR(64) NOT NULL DEFAULT ''",
         "promotion_status": "VARCHAR(64) NOT NULL DEFAULT 'pending'",
         "feedback_action": "VARCHAR(32) NOT NULL DEFAULT ''",

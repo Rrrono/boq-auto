@@ -131,6 +131,9 @@ def test_sync_claim_and_submit_review_tasks() -> None:
     sync_body = sync_response.json()
     assert sync_body["job_id"] == job_id
     assert "tasks" in sync_body
+    assert sync_body["tasks"][0]["task_type"] in {"candidate_selection", "match_confirmation", "manual_rate_entry", "category_classification", "section_alignment"}
+    assert sync_body["tasks"][0]["task_question"]
+    assert isinstance(sync_body["tasks"][0]["response_schema"], list)
 
     tasks_response = client.get("/review-tasks")
     assert tasks_response.status_code == 200
@@ -248,3 +251,25 @@ def test_review_task_can_move_into_qa_states() -> None:
         },
     )
     assert invalid_qa_response.status_code == 400
+
+
+def test_unmatched_rows_create_manual_rate_tasks() -> None:
+    create_response = client.post("/jobs", json={"title": "Reviewer Task Type Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    upload_response = client.post(
+        f"/jobs/{job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("sample.xlsx", _build_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert upload_response.status_code == 200
+
+    price_response = client.post(f"/jobs/{job_id}/price-boq")
+    assert price_response.status_code == 200
+
+    sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    assert sync_response.status_code == 200
+    tasks = sync_response.json()["tasks"]
+    assert tasks
+    assert any(task["task_question"] for task in tasks)
+    assert any(task["response_schema"] for task in tasks)

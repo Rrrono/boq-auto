@@ -64,6 +64,9 @@ class ReviewTaskResponse(BaseModel):
     description: str
     matched_description: str
     matched_item_code: str = ""
+    task_type: str = "match_confirmation"
+    task_question: str = ""
+    response_schema: list[str] = Field(default_factory=list)
     unit: str
     decision: str
     confidence_score: float

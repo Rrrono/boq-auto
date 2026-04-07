@@ -131,6 +131,9 @@ export type ReviewTask = {
   description: string;
   matched_description: string;
   matched_item_code: string;
+  task_type: string;
+  task_question: string;
+  response_schema: string[];
   unit: string;
   decision: string;
   confidence_score: number;
