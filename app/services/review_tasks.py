@@ -49,7 +49,12 @@ def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
         submitted_match_description=task.submitted_match_description,
         submitted_rate=task.submitted_rate,
         reviewer_note=task.reviewer_note,
+        qa_status=task.qa_status,
+        qa_reviewer_uid=task.qa_reviewer_uid,
+        qa_reviewer_email=task.qa_reviewer_email,
+        qa_note=task.qa_note,
         submitted_at=task.submitted_at,
+        qa_updated_at=task.qa_updated_at,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -155,8 +160,35 @@ def submit_review_task(
     task.submitted_match_description = matched_description.strip()
     task.submitted_rate = rate
     task.reviewer_note = reviewer_note.strip()
+    task.qa_status = "pending"
+    task.qa_reviewer_uid = ""
+    task.qa_reviewer_email = ""
+    task.qa_note = ""
     now = datetime.now(timezone.utc)
     task.submitted_at = now
+    task.qa_updated_at = None
+    task.updated_at = now
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+def qa_review_task(
+    db: Session,
+    task: ReviewTask,
+    reviewer_uid: str,
+    reviewer_email: str | None,
+    *,
+    qa_status: str,
+    qa_note: str,
+) -> ReviewTask:
+    normalized_status = qa_status.strip().lower()
+    task.qa_status = normalized_status
+    task.qa_reviewer_uid = reviewer_uid
+    task.qa_reviewer_email = reviewer_email or ""
+    task.qa_note = qa_note.strip()
+    now = datetime.now(timezone.utc)
+    task.qa_updated_at = now
     task.updated_at = now
     db.commit()
     db.refresh(task)

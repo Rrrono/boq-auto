@@ -88,7 +88,12 @@ class ReviewTask(Base):
     submitted_match_description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     submitted_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
     reviewer_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    qa_status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False, index=True)
+    qa_reviewer_uid: Mapped[str] = mapped_column(String(128), default="", nullable=False)
+    qa_reviewer_email: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    qa_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    qa_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 

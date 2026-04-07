@@ -141,7 +141,12 @@ export type ReviewTask = {
   submitted_match_description: string;
   submitted_rate: number | null;
   reviewer_note: string;
+  qa_status: string;
+  qa_reviewer_uid: string;
+  qa_reviewer_email: string;
+  qa_note: string;
   submitted_at: string | null;
+  qa_updated_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -296,6 +301,19 @@ export async function submitReviewTask(
   token?: string | null,
 ): Promise<ReviewTask> {
   return apiFetch<ReviewTask>(`/review-tasks/${taskId}/submit`, {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function qaReviewTask(
+  taskId: number,
+  payload: { qa_status: string; qa_note: string },
+  token?: string | null,
+): Promise<ReviewTask> {
+  return apiFetch<ReviewTask>(`/review-tasks/${taskId}/qa`, {
     token,
     method: "POST",
     headers: { "Content-Type": "application/json" },

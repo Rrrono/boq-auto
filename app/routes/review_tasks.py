@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.auth import AuthenticatedUser, require_authenticated_user
 from app.db import get_db
-from app.models.job import ReviewTaskResponse, ReviewTaskSubmissionRequest, ReviewTaskSyncResponse
+from app.models.job import ReviewTaskQaRequest, ReviewTaskResponse, ReviewTaskSubmissionRequest, ReviewTaskSyncResponse
 from app.services.jobs import get_job
 from app.services.review_tasks import (
     claim_review_task,
     get_review_task,
     list_review_tasks,
+    qa_review_task,
     serialize_review_task,
     submit_review_task,
     sync_review_tasks_for_job,
@@ -84,5 +85,30 @@ def submit_review_task_endpoint(
         matched_description=payload.matched_description,
         rate=payload.rate,
         reviewer_note=payload.reviewer_note,
+    )
+    return serialize_review_task(updated)
+
+
+@router.post("/review-tasks/{task_id}/qa", response_model=ReviewTaskResponse)
+def qa_review_task_endpoint(
+    task_id: int,
+    payload: ReviewTaskQaRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> ReviewTaskResponse:
+    task = get_review_task(db, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Review task not found.")
+    if task.status != "submitted":
+        raise HTTPException(status_code=409, detail="Only submitted review tasks can move into QA states.")
+    if payload.qa_status.strip().lower() not in {"approved", "rejected", "escalated"}:
+        raise HTTPException(status_code=400, detail="QA status must be approved, rejected, or escalated.")
+    updated = qa_review_task(
+        db,
+        task,
+        reviewer_uid=user.uid,
+        reviewer_email=user.email,
+        qa_status=payload.qa_status,
+        qa_note=payload.qa_note,
     )
     return serialize_review_task(updated)

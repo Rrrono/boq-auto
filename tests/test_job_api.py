@@ -199,3 +199,49 @@ def test_review_task_cannot_be_claimed_or_submitted_twice() -> None:
         },
     )
     assert second_submit.status_code == 409
+
+
+def test_review_task_can_move_into_qa_states() -> None:
+    create_response = client.post("/jobs", json={"title": "Reviewer QA Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    client.post(
+        f"/jobs/{job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("sample.xlsx", _build_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    client.post(f"/jobs/{job_id}/price-boq")
+    sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    task_id = sync_response.json()["tasks"][0]["id"]
+
+    client.post(f"/review-tasks/{task_id}/claim")
+    client.post(
+        f"/review-tasks/{task_id}/submit",
+        json={
+            "decision": "confirm_match",
+            "matched_description": "Confirmed line",
+            "rate": None,
+            "reviewer_note": "Ready for QA.",
+        },
+    )
+
+    qa_response = client.post(
+        f"/review-tasks/{task_id}/qa",
+        json={
+            "qa_status": "approved",
+            "qa_note": "Good reviewer submission.",
+        },
+    )
+    assert qa_response.status_code == 200
+    qa_body = qa_response.json()
+    assert qa_body["qa_status"] == "approved"
+    assert qa_body["qa_note"] == "Good reviewer submission."
+
+    invalid_qa_response = client.post(
+        f"/review-tasks/{task_id}/qa",
+        json={
+            "qa_status": "invalid_state",
+            "qa_note": "",
+        },
+    )
+    assert invalid_qa_response.status_code == 400

@@ -156,6 +156,7 @@ As of the latest tracked state in this repo:
   - reviewers can submit structured review responses
   - the queue supports shared scope and "my tasks only" scope
   - backend guardrails prevent one reviewer from submitting another reviewer's claimed task
+  - submitted tasks can now move into QA states: `approved`, `rejected`, or `escalated`
 
 Recent important commits:
 
@@ -236,11 +237,19 @@ Improve pricing quality, especially for weak/non-core categories:
 
 The current reviewer queue is intentionally MVP-level. The next best extensions are:
 
-- reviewer QA states such as approved/rejected/escalated
 - bulk actions for grouped weak items
 - promotion hooks from submitted review tasks into the existing review/promotion foundations
 - reviewer performance and workload summaries
 - clearer mapping between submitted task outcomes and `match_feedback` / promotion flows
+
+### Current in-flight direction
+
+The next active slice after this handover update is:
+
+1. connect approved/escalated review tasks to promotion and feedback hooks
+2. add bulk actions for grouped reviewer work
+3. preserve the review-first architecture without creating a separate moderation pipeline
+4. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
 
 ## Working Principles For The Next Codex
 

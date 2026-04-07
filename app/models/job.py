@@ -74,7 +74,12 @@ class ReviewTaskResponse(BaseModel):
     submitted_match_description: str = ""
     submitted_rate: float | None = None
     reviewer_note: str = ""
+    qa_status: str = "pending"
+    qa_reviewer_uid: str = ""
+    qa_reviewer_email: str = ""
+    qa_note: str = ""
     submitted_at: datetime | None = None
+    qa_updated_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -91,3 +96,8 @@ class ReviewTaskSubmissionRequest(BaseModel):
     matched_description: str = Field(default="", max_length=2000)
     rate: float | None = None
     reviewer_note: str = Field(default="", max_length=4000)
+
+
+class ReviewTaskQaRequest(BaseModel):
+    qa_status: str = Field(min_length=1, max_length=32)
+    qa_note: str = Field(default="", max_length=4000)

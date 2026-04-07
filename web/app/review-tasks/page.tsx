@@ -9,6 +9,7 @@ import {
   claimReviewTask,
   getErrorMessage,
   listReviewTasks,
+  qaReviewTask,
   submitReviewTask,
 } from "../../lib/platform-api";
 
@@ -24,7 +25,7 @@ export default function ReviewTasksPage() {
   const [statusFilter, setStatusFilter] = useState("open");
   const [mineOnly, setMineOnly] = useState(false);
   const [savingTaskId, setSavingTaskId] = useState<number | null>(null);
-  const [drafts, setDrafts] = useState<Record<number, { decision: string; matched_description: string; rate: string; reviewer_note: string }>>({});
+  const [drafts, setDrafts] = useState<Record<number, { decision: string; matched_description: string; rate: string; reviewer_note: string; qa_status: string; qa_note: string }>>({});
 
   useEffect(() => {
     if (loading || (configured && !user)) {
@@ -77,6 +78,8 @@ export default function ReviewTasksPage() {
       matched_description: task.matched_description,
       rate: "",
       reviewer_note: "",
+      qa_status: task.qa_status === "pending" ? "approved" : task.qa_status,
+      qa_note: task.qa_note,
     };
   }
 
@@ -124,6 +127,28 @@ export default function ReviewTasksPage() {
     }
   }
 
+  async function onQaSubmit(task: ReviewTask) {
+    const draft = getDraft(task);
+    setSavingTaskId(task.id);
+    setTasksError("");
+    try {
+      const token = await getIdToken();
+      await qaReviewTask(
+        task.id,
+        {
+          qa_status: draft.qa_status,
+          qa_note: draft.qa_note,
+        },
+        token,
+      );
+      await refreshTasks();
+    } catch (error) {
+      setTasksError(getErrorMessage(error, "The QA decision could not be saved."));
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
   return (
     <div className="stack">
       <section className="hero">
@@ -154,6 +179,10 @@ export default function ReviewTasksPage() {
         <div className="metaRow">
           <strong>Submitted</strong>
           <span>{loadingTasks ? "Loading..." : summary.submitted}</span>
+        </div>
+        <div className="metaRow">
+          <strong>QA-ready</strong>
+          <span>{loadingTasks ? "Loading..." : tasks.filter((task) => task.status === "submitted").length}</span>
         </div>
         <div className="metaRow">
           <strong>Signed in reviewer</strong>
@@ -227,6 +256,10 @@ export default function ReviewTasksPage() {
                     <div className="metaRow">
                       <strong>Reviewer</strong>
                       <span>{task.reviewer_email || "Unassigned"}</span>
+                    </div>
+                    <div className="metaRow">
+                      <strong>QA status</strong>
+                      <span>{task.qa_status}</span>
                     </div>
                   </div>
 
@@ -323,6 +356,52 @@ export default function ReviewTasksPage() {
                           {savingTaskId === task.id ? "Submitting..." : "Submit review"}
                         </button>
                       )}
+                    </form>
+                  ) : null}
+
+                  {task.status === "submitted" ? (
+                    <form
+                      className="form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void onQaSubmit(task);
+                      }}
+                    >
+                      <label>
+                        QA outcome
+                        <select
+                          value={draft.qa_status}
+                          onChange={(event) =>
+                            setDrafts((current) => ({
+                              ...current,
+                              [task.id]: { ...draft, qa_status: event.target.value },
+                            }))
+                          }
+                        >
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="escalated">Escalated</option>
+                        </select>
+                      </label>
+                      <label>
+                        QA note
+                        <textarea
+                          rows={2}
+                          value={draft.qa_note}
+                          onChange={(event) =>
+                            setDrafts((current) => ({
+                              ...current,
+                              [task.id]: { ...draft, qa_note: event.target.value },
+                            }))
+                          }
+                        />
+                      </label>
+                      <button type="submit" disabled={savingTaskId === task.id}>
+                        {savingTaskId === task.id ? "Saving QA..." : "Save QA state"}
+                      </button>
+                      <p className="helperText">
+                        Current QA owner: {task.qa_reviewer_email || "Unassigned"} {task.qa_updated_at ? `· updated ${new Date(task.qa_updated_at).toLocaleString()}` : ""}
+                      </p>
                     </form>
                   ) : null}
                 </article>
