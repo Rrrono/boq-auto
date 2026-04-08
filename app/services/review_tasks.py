@@ -14,6 +14,7 @@ from app.models.job import (
     ReviewTaskBacklogAreaResponse,
     ReviewTaskBridgeSummaryResponse,
     ReviewTaskBridgeSyncResponse,
+    ReviewTaskReviewerSummaryResponse,
     ReviewTaskResponse,
     ReviewTaskSyncResponse,
 )
@@ -410,10 +411,65 @@ def _taxonomy_backlog() -> list[ReviewTaskBacklogAreaResponse]:
     ]
 
 
+def _reviewer_workload() -> list[ReviewTaskReviewerSummaryResponse]:
+    workload: dict[str, dict[str, int]] = {}
+    with SessionLocal() as db:
+        tasks = list(db.query(ReviewTask).order_by(ReviewTask.updated_at.desc()).all())
+
+    for task in tasks:
+        reviewer_label = (
+            task.reviewer_email
+            or task.qa_reviewer_email
+            or task.reviewer_uid
+            or task.qa_reviewer_uid
+            or ""
+        ).strip()
+        if not reviewer_label:
+            continue
+        stats = workload.setdefault(
+            reviewer_label,
+            {
+                "claimed_count": 0,
+                "submitted_count": 0,
+                "approved_count": 0,
+                "promotion_logged_count": 0,
+            },
+        )
+        if task.status == "claimed":
+            stats["claimed_count"] += 1
+        if task.status == "submitted":
+            stats["submitted_count"] += 1
+        if task.qa_status == "approved":
+            stats["approved_count"] += 1
+        if task.promotion_status == "logged":
+            stats["promotion_logged_count"] += 1
+
+    return [
+        ReviewTaskReviewerSummaryResponse(
+            reviewer_email=reviewer_email,
+            claimed_count=stats["claimed_count"],
+            submitted_count=stats["submitted_count"],
+            approved_count=stats["approved_count"],
+            promotion_logged_count=stats["promotion_logged_count"],
+        )
+        for reviewer_email, stats in sorted(
+            workload.items(),
+            key=lambda entry: (
+                -(entry[1]["submitted_count"] + entry[1]["approved_count"] + entry[1]["promotion_logged_count"]),
+                entry[0],
+            ),
+        )[:6]
+    ]
+
+
 def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
     workbook_path, schema_path = _resolve_workbook_and_schema_paths()
     if workbook_path is None or schema_path is None or not schema_path.exists():
-        return ReviewTaskBridgeSummaryResponse(available=False)
+        return ReviewTaskBridgeSummaryResponse(
+            available=False,
+            taxonomy_backlog=_taxonomy_backlog(),
+            reviewer_workload=_reviewer_workload(),
+        )
 
     repository = CostDatabase(schema_path)
     synced_candidate_rows, pending_workbook_candidates = _count_synced_candidate_rows(workbook_path)
@@ -427,6 +483,7 @@ def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
         synced_candidate_rows=synced_candidate_rows,
         pending_workbook_candidates=pending_workbook_candidates,
         taxonomy_backlog=_taxonomy_backlog(),
+        reviewer_workload=_reviewer_workload(),
     )
 
 

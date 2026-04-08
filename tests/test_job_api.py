@@ -341,6 +341,13 @@ def test_bulk_qa_review_tasks_updates_submitted_tasks() -> None:
     assert body["tasks"][0]["id"] == task_id
     assert body["tasks"][0]["qa_status"] == "approved"
 
+    summary_response = client.get("/review-tasks/bridge")
+    assert summary_response.status_code == 200
+    summary_body = summary_response.json()
+    reviewers = {entry["reviewer_email"]: entry for entry in summary_body["reviewer_workload"]}
+    assert "local-dev" in reviewers
+    assert reviewers["local-dev"]["approved_count"] >= 1
+
 
 def test_review_task_can_move_into_qa_states() -> None:
     create_response = client.post("/jobs", json={"title": "Reviewer QA Job", "region": "Nairobi"})

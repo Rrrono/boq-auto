@@ -107,6 +107,14 @@ class ReviewTaskBacklogAreaResponse(BaseModel):
     count: int = 0
 
 
+class ReviewTaskReviewerSummaryResponse(BaseModel):
+    reviewer_email: str
+    claimed_count: int = 0
+    submitted_count: int = 0
+    approved_count: int = 0
+    promotion_logged_count: int = 0
+
+
 class ReviewTaskBridgeSummaryResponse(BaseModel):
     available: bool
     workbook_path: str = ""
@@ -117,6 +125,7 @@ class ReviewTaskBridgeSummaryResponse(BaseModel):
     synced_candidate_rows: int = 0
     pending_workbook_candidates: int = 0
     taxonomy_backlog: list[ReviewTaskBacklogAreaResponse] = Field(default_factory=list)
+    reviewer_workload: list[ReviewTaskReviewerSummaryResponse] = Field(default_factory=list)
 
 
 class ReviewTaskBridgeSyncResponse(BaseModel):

@@ -181,6 +181,13 @@ export type ReviewTaskBridgeSummary = {
   synced_candidate_rows: number;
   pending_workbook_candidates: number;
   taxonomy_backlog: Array<{ label: string; count: number }>;
+  reviewer_workload: Array<{
+    reviewer_email: string;
+    claimed_count: number;
+    submitted_count: number;
+    approved_count: number;
+    promotion_logged_count: number;
+  }>;
 };
 
 export type ReviewTaskBridgeSyncResponse = {

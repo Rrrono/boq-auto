@@ -348,6 +348,14 @@ export default function ReviewTasksPage() {
         </p>
       </section>
 
+      <section className="card" style={{ borderColor: "color-mix(in srgb, var(--accent) 24%, transparent)" }}>
+        <span className="pill">Operations Board</span>
+        <h3>Phase 3 reviewer operations are now measurable.</h3>
+        <p className="helperText" style={{ marginTop: 8 }}>
+          After redeploy, look for this board plus a reviewer workload table under the Learning Bridge. That is the clearest signal that the operations-phase UI is live.
+        </p>
+      </section>
+
       <section className="hero">
         <span className="eyebrow">Reviewer Workflow</span>
         <h2 className="headline">Review tasks turn weak BOQ rows into claimable work.</h2>
@@ -493,6 +501,24 @@ export default function ReviewTasksPage() {
                   Reset queue filters
                 </button>
               </div>
+            </div>
+            <div className="card" style={{ marginTop: 14 }}>
+              <span className="pill">Reviewer Workload</span>
+              <h3>Who is moving review work forward</h3>
+              {bridge.reviewer_workload.length === 0 ? (
+                <div className="emptyState">No reviewer workload is visible yet.</div>
+              ) : (
+                <div className="metaGrid">
+                  {bridge.reviewer_workload.map((reviewer) => (
+                    <div key={reviewer.reviewer_email} className="metaRow">
+                      <strong>{reviewer.reviewer_email}</strong>
+                      <span>
+                        Claimed {reviewer.claimed_count} | Submitted {reviewer.submitted_count} | Approved {reviewer.approved_count} | Logged {reviewer.promotion_logged_count}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <p className="helperText">
               Workbook: <span className="monoText">{bridge.workbook_path}</span>

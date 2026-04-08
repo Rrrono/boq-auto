@@ -271,6 +271,11 @@ Recent uncommitted work in the current checkpoint:
     - bulk claim controls
     - bulk QA controls
   - this is the clearest hosted signal yet that BOQ AUTO has entered the reviewer-operations phase rather than only showing review queues
+- the next reviewer-operations slice now adds an operations-board layer:
+  - the hosted reviewer page now also shows a clear `Operations Board` card near the top
+  - the Learning Bridge now includes a `Reviewer Workload` summary
+  - reviewer workload remains visible even if the workbook/schema bridge itself is unavailable
+  - this makes the reviewer page look and behave more like a managed operations surface than a raw queue
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
@@ -423,6 +428,8 @@ The current reviewer queue is intentionally MVP-level. The next best extensions 
 - clearer mapping between submitted task outcomes and `match_feedback` / promotion flows
 - richer task-type generation so more uncertainty modes become explicit reviewer questions instead of generic review prompts
 - the next natural step after the current milestone is bulk promotion-readiness or bulk bridge-sync actions so QA-approved clusters move forward just as easily as they can now be claimed and QA’d
+- the next natural step after the current milestone is bulk promotion-readiness or bulk bridge-sync actions so QA-approved clusters move forward just as easily as they can now be claimed and QA’d
+- after that, reviewer performance summaries, payout-readiness, and managed assignment rules become the clearest path toward a fuller reviewer marketplace phase
 
 ### Current in-flight direction
 
@@ -437,6 +444,7 @@ The next active slice after this handover update is:
 7. keep `scripts/deploy_all_cloudshell.sh` updated whenever runtime env vars or deploy assumptions change
 8. add the first safe bulk reviewer action so filtered backlog clusters can be claimed in batches without bypassing submission or QA
 9. add bulk QA actions and a visible milestone marker so the hosted reviewer workflow clearly signals when the Phase 3 reviewer-operations slice is live
+10. add reviewer workload / promotion summaries so the hosted reviewer page starts behaving like an operations board, not just a queue
 
 ## Working Principles For The Next Codex
 
