@@ -425,6 +425,13 @@ def test_specialist_gap_rows_create_specialist_task_types() -> None:
     assert specialist_tasks[0]["focus_area"] in {"survey", "general_gap"}
     assert "category_direction" in specialist_tasks[0]["response_schema"]
 
+    filtered_response = client.get("/review-tasks", params={"focus_area": "survey", "specialist_only": "true"})
+    assert filtered_response.status_code == 200
+    filtered_tasks = filtered_response.json()
+    assert filtered_tasks
+    assert all(task["specialist_gap_flag"] for task in filtered_tasks)
+    assert all(task["focus_area"] == "survey" or task["submitted_category_direction"] == "survey" for task in filtered_tasks)
+
 
 def test_category_direction_submission_is_persisted_and_promoted(tmp_path) -> None:
     schema_source = tmp_path / "runtime_master.xlsx"

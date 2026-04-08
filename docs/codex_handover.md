@@ -254,6 +254,11 @@ Recent uncommitted work in the current checkpoint:
   - when that object was missing, Cloud Run returned `500` only for the bridge route while the queue route continued returning `200`
   - the immediate operational fix was to upload the missing sidecar to the runtime bucket
   - the frontend should therefore treat queue loading and bridge loading independently so bridge failures do not blank the whole reviewer page
+- the next reviewer-operations slice is now in place:
+  - review-task API filtering now supports `focus_area` and `specialist_only`
+  - the hosted reviewer page can now work the taxonomy backlog directly by clicking a backlog area
+  - queue controls now support focus-area filtering, specialist-only filtering, and quick actions for promotion-ready or QA-ready work
+  - this moves the backlog from a passive summary toward an operational triage surface
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
@@ -393,12 +398,14 @@ Improve pricing quality, especially for weak/non-core categories:
 3. identify top missing knowledge clusters from real bad runs
 4. extend hosted reviewer action workflows so submitted tasks can feed promotions and learning
 5. begin taxonomy-first schema design for domains such as roads, structures, water/pipes, plant, survey, lab/testing, and accommodation/furniture
+6. make the taxonomy backlog operational by letting reviewers filter and triage queue work by focus area and specialist-gap scope
 
 ### Immediate reviewer-workflow follow-up
 
 The current reviewer queue is intentionally MVP-level. The next best extensions are:
 
 - bulk actions for grouped weak items
+- backlog-driven queue filters so reviewers can work one focus area at a time
 - deeper promotion hooks from submitted review tasks into the existing review/promotion foundations
 - reviewer performance and workload summaries
 - clearer mapping between submitted task outcomes and `match_feedback` / promotion flows

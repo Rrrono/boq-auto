@@ -302,7 +302,7 @@ export async function getKnowledgeQueue(limit = 50, token?: string | null): Prom
 }
 
 export async function listReviewTasks(
-  options?: { status?: string; qa_status?: string; promotion_status?: string; mine?: boolean },
+  options?: { status?: string; qa_status?: string; promotion_status?: string; focus_area?: string; specialist_only?: boolean; mine?: boolean },
   token?: string | null,
 ): Promise<ReviewTask[]> {
   const params = new URLSearchParams();
@@ -314,6 +314,12 @@ export async function listReviewTasks(
   }
   if (options?.promotion_status) {
     params.set("promotion_status", options.promotion_status);
+  }
+  if (options?.focus_area) {
+    params.set("focus_area", options.focus_area);
+  }
+  if (options?.specialist_only) {
+    params.set("specialist_only", "true");
   }
   if (options?.mine) {
     params.set("mine", "true");

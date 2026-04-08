@@ -40,6 +40,8 @@ export default function ReviewTasksPage() {
   const [statusFilter, setStatusFilter] = useState("open");
   const [qaFilter, setQaFilter] = useState("");
   const [promotionFilter, setPromotionFilter] = useState("");
+  const [focusAreaFilter, setFocusAreaFilter] = useState("");
+  const [specialistOnly, setSpecialistOnly] = useState(false);
   const [mineOnly, setMineOnly] = useState(false);
   const [savingTaskId, setSavingTaskId] = useState<number | null>(null);
   const [syncingBridge, setSyncingBridge] = useState(false);
@@ -51,6 +53,8 @@ export default function ReviewTasksPage() {
       status?: string;
       qa_status?: string;
       promotion_status?: string;
+      focus_area?: string;
+      specialist_only?: boolean;
       mine?: boolean;
     },
   ) {
@@ -88,6 +92,8 @@ export default function ReviewTasksPage() {
         status: statusFilter || undefined,
         qa_status: qaFilter || undefined,
         promotion_status: promotionFilter || undefined,
+        focus_area: focusAreaFilter || undefined,
+        specialist_only: specialistOnly,
         mine: mineOnly,
       };
       const token = await requireToken();
@@ -125,7 +131,7 @@ export default function ReviewTasksPage() {
     return () => {
       cancelled = true;
     };
-  }, [configured, getIdToken, loading, mineOnly, promotionFilter, qaFilter, statusFilter, user]);
+  }, [configured, focusAreaFilter, getIdToken, loading, mineOnly, promotionFilter, qaFilter, specialistOnly, statusFilter, user]);
 
   const summary = useMemo(() => {
     const counts = new Map<string, number>();
@@ -138,6 +144,24 @@ export default function ReviewTasksPage() {
       submitted: counts.get("submitted") ?? 0,
     };
   }, [tasks]);
+
+  const availableFocusAreas = useMemo(() => {
+    const labels = new Set<string>();
+    for (const task of tasks) {
+      if (task.focus_area) {
+        labels.add(task.focus_area);
+      }
+      if (task.submitted_category_direction) {
+        labels.add(task.submitted_category_direction);
+      }
+    }
+    for (const area of bridge?.taxonomy_backlog ?? []) {
+      if (area.label) {
+        labels.add(area.label);
+      }
+    }
+    return Array.from(labels).sort();
+  }, [bridge?.taxonomy_backlog, tasks]);
 
   function getDraft(task: ReviewTask): ReviewDraft {
     return drafts[task.id] ?? {
@@ -157,6 +181,8 @@ export default function ReviewTasksPage() {
       status: statusFilter || undefined,
       qa_status: qaFilter || undefined,
       promotion_status: promotionFilter || undefined,
+      focus_area: focusAreaFilter || undefined,
+      specialist_only: specialistOnly,
       mine: mineOnly,
     };
     await loadQueue(token, filters);
@@ -343,13 +369,55 @@ export default function ReviewTasksPage() {
               ) : (
                 <div className="metaGrid">
                   {bridge.taxonomy_backlog.map((area) => (
-                    <div key={area.label} className="metaRow">
+                    <button
+                      key={area.label}
+                      type="button"
+                      className="metaRow"
+                      style={{ textAlign: "left", background: "transparent" }}
+                      onClick={() => {
+                        setFocusAreaFilter(area.label);
+                        setSpecialistOnly(true);
+                      }}
+                    >
                       <strong>{area.label.replaceAll("_", " ")}</strong>
                       <span>{area.count} reviewer tasks</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
+              <div className="inlineActions" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromotionFilter("ready");
+                    setStatusFilter("");
+                  }}
+                >
+                  Show promotion-ready tasks
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQaFilter("pending");
+                    setStatusFilter("submitted");
+                  }}
+                >
+                  Show QA-ready tasks
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("open");
+                    setQaFilter("");
+                    setPromotionFilter("");
+                    setFocusAreaFilter("");
+                    setSpecialistOnly(false);
+                    setMineOnly(false);
+                  }}
+                >
+                  Reset queue filters
+                </button>
+              </div>
             </div>
             <p className="helperText">
               Workbook: <span className="monoText">{bridge.workbook_path}</span>
@@ -397,11 +465,35 @@ export default function ReviewTasksPage() {
               <option value="closed">Closed</option>
             </select>
           </label>
+          <label>
+            Focus area
+            <select value={focusAreaFilter} onChange={(event) => setFocusAreaFilter(event.target.value)}>
+              <option value="">All</option>
+              {availableFocusAreas.map((label) => (
+                <option key={label} value={label}>
+                  {label.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" checked={specialistOnly} onChange={(event) => setSpecialistOnly(event.target.checked)} />
+            Specialist only
+          </label>
           <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input type="checkbox" checked={mineOnly} onChange={(event) => setMineOnly(event.target.checked)} />
             My tasks only
           </label>
         </div>
+
+        {(focusAreaFilter || specialistOnly) ? (
+          <p className="helperText" style={{ marginTop: 12 }}>
+            Working filter:
+            {" "}
+            {focusAreaFilter ? `focus area ${focusAreaFilter.replaceAll("_", " ")}` : "all focus areas"}
+            {specialistOnly ? " - specialist gaps only" : ""}
+          </p>
+        ) : null}
 
         {loadingTasks ? (
           <div className="emptyState">Loading review tasks...</div>

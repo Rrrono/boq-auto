@@ -37,17 +37,25 @@ def list_review_tasks_endpoint(
     status: str | None = Query(default=None),
     qa_status: str | None = Query(default=None),
     promotion_status: str | None = Query(default=None),
+    focus_area: str | None = Query(default=None),
+    specialist_only: bool = Query(default=False),
     mine: bool = Query(default=False),
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> list[ReviewTaskResponse]:
     reviewer_uid = user.uid if mine else None
     tasks = list_review_tasks(db, status=status, reviewer_uid=reviewer_uid)
+    serialized = [serialize_review_task(task) for task in tasks]
     if qa_status:
-        tasks = [task for task in tasks if task.qa_status == qa_status]
+        serialized = [task for task in serialized if task.qa_status == qa_status]
     if promotion_status:
-        tasks = [task for task in tasks if task.promotion_status == promotion_status]
-    return [serialize_review_task(task) for task in tasks]
+        serialized = [task for task in serialized if task.promotion_status == promotion_status]
+    if focus_area:
+        normalized_focus_area = focus_area.strip().lower().replace(" ", "_")
+        serialized = [task for task in serialized if task.focus_area == normalized_focus_area or task.submitted_category_direction == normalized_focus_area]
+    if specialist_only:
+        serialized = [task for task in serialized if task.specialist_gap_flag]
+    return serialized
 
 
 @router.get("/review-tasks/bridge", response_model=ReviewTaskBridgeSummaryResponse)
