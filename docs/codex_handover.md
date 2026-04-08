@@ -238,6 +238,11 @@ Recent uncommitted work in the current checkpoint:
     - domain-aware manual rate entry
     - category direction correction
   - this keeps the marketplace/reviewer path aligned with the real knowledge gap instead of pretending every specialist miss is only a pricing problem
+- the next follow-on slice should make reviewer answers more structured, not just better-worded:
+  - specialist tasks need a dedicated `category_direction` answer field
+  - that field should persist on the task itself
+  - approved outcomes should carry that structured direction into normalized promotion metadata
+  - the goal is to turn specialist review into reusable taxonomy guidance rather than losing it inside reviewer notes
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit

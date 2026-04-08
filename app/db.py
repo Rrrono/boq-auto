@@ -47,6 +47,7 @@ def _ensure_review_task_columns() -> None:
         "promotion_status": "VARCHAR(64) NOT NULL DEFAULT 'pending'",
         "feedback_action": "VARCHAR(32) NOT NULL DEFAULT ''",
         "feedback_logged_at": "TIMESTAMP NULL",
+        "submitted_category_direction": "VARCHAR(128) NOT NULL DEFAULT ''",
     }
 
     with engine.begin() as connection:

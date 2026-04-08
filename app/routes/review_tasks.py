@@ -112,6 +112,7 @@ def submit_review_task_endpoint(
         reviewer_uid=user.uid,
         reviewer_email=user.email,
         decision=payload.decision,
+        category_direction=payload.category_direction,
         matched_description=payload.matched_description,
         rate=payload.rate,
         reviewer_note=payload.reviewer_note,

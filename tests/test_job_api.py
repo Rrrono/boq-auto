@@ -193,6 +193,7 @@ def test_sync_claim_and_submit_review_tasks() -> None:
         f"/review-tasks/{first_task['id']}/submit",
         json={
             "decision": "manual_rate",
+            "category_direction": "",
             "matched_description": "Manual review item",
             "rate": 1250.0,
             "reviewer_note": "Reviewed for marketplace workflow smoke test.",
@@ -225,6 +226,7 @@ def test_review_task_cannot_be_claimed_or_submitted_twice() -> None:
         f"/review-tasks/{task_id}/submit",
         json={
             "decision": "confirm_match",
+            "category_direction": "",
             "matched_description": "Confirmed from review queue",
             "rate": None,
             "reviewer_note": "First submission",
@@ -239,6 +241,7 @@ def test_review_task_cannot_be_claimed_or_submitted_twice() -> None:
         f"/review-tasks/{task_id}/submit",
         json={
             "decision": "no_good_match",
+            "category_direction": "",
             "matched_description": "",
             "rate": None,
             "reviewer_note": "Second submission should fail",
@@ -265,6 +268,7 @@ def test_review_task_can_move_into_qa_states() -> None:
         f"/review-tasks/{task_id}/submit",
         json={
             "decision": "manual_rate",
+            "category_direction": "",
             "matched_description": "Manual line",
             "rate": 2250.0,
             "reviewer_note": "Ready for QA and promotion planning.",
@@ -351,6 +355,7 @@ def test_approved_manual_rate_creates_rate_observation(tmp_path) -> None:
         f"/review-tasks/{task_id}/submit",
         json={
           "decision": "manual_rate",
+          "category_direction": "",
           "matched_description": "Manual reviewed trench rate",
           "rate": 3100.0,
           "reviewer_note": "Use reviewed site rate.",
@@ -419,6 +424,88 @@ def test_specialist_gap_rows_create_specialist_task_types() -> None:
     assert specialist_tasks[0]["task_type"] in {"specialist_classification", "specialist_rate_entry"}
     assert specialist_tasks[0]["focus_area"] in {"survey", "general_gap"}
     assert "category_direction" in specialist_tasks[0]["response_schema"]
+
+
+def test_category_direction_submission_is_persisted_and_promoted(tmp_path) -> None:
+    schema_source = tmp_path / "runtime_master.xlsx"
+    _build_runtime_database(schema_source)
+    os.environ["BOQ_AUTO_API_DB_PATH"] = str(schema_source)
+    repository = CostDatabase(schema_source)
+    repository.initialize()
+
+    create_response = client.post("/jobs", json={"title": "Category Direction Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    with SessionLocal() as db:
+        job_run = JobRun(
+            job_id=job_id,
+            run_type="price_boq",
+            status="completed",
+            processed=1,
+            matched=0,
+            flagged=1,
+            total_cost=0.0,
+            currency="KES",
+            output_storage_uri="",
+            audit_storage_uri="",
+            result_payload="{}",
+        )
+        db.add(job_run)
+        db.flush()
+        task = ReviewTask(
+            job_id=job_id,
+            job_run_id=job_run.id,
+            status="claimed",
+            source_row_key="BOQ:2:Survey Equipment",
+            sheet_name="BOQ",
+            row_number=2,
+            description="Survey Equipment",
+            matched_description="",
+            matched_item_code="",
+            task_type="specialist_classification",
+            task_question="Describe the right category direction for this specialist row.",
+            response_schema_json='["category_direction","manual_rate","reviewer_note"]',
+            unit="Lump Sum",
+            decision="unmatched",
+            confidence_score=0.0,
+            confidence_band="very_low",
+            flag_reasons_json='["generic_match","confidence_very_low"]',
+            reviewer_uid="local-dev",
+            reviewer_email="",
+        )
+        db.add(task)
+        db.commit()
+        task_id = task.id
+
+    submit_response = client.post(
+        f"/review-tasks/{task_id}/submit",
+        json={
+            "decision": "category_direction",
+            "category_direction": "survey",
+            "matched_description": "",
+            "rate": None,
+            "reviewer_note": "This belongs in survey equipment/services, not general preliminaries.",
+        },
+    )
+    assert submit_response.status_code == 200
+    submitted = submit_response.json()
+    assert submitted["submitted_category_direction"] == "survey"
+
+    qa_response = client.post(
+        f"/review-tasks/{task_id}/qa",
+        json={
+            "qa_status": "approved",
+            "qa_note": "Good category correction.",
+        },
+    )
+    assert qa_response.status_code == 200
+    qa_body = qa_response.json()
+    assert qa_body["promotion_target"] == "candidate_review"
+    assert qa_body["promotion_status"] == "logged"
+
+    reviews = repository.fetch_candidate_reviews()
+    assert reviews
+    assert reviews[0].reason == "survey"
 
 
 def test_review_task_bridge_summary_and_sync_endpoint(tmp_path) -> None:

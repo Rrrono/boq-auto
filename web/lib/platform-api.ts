@@ -146,6 +146,7 @@ export type ReviewTask = {
   reviewer_uid: string;
   reviewer_email: string;
   submitted_decision: string;
+  submitted_category_direction: string;
   submitted_match_description: string;
   submitted_rate: number | null;
   reviewer_note: string;
@@ -336,7 +337,7 @@ export async function claimReviewTask(taskId: number, token?: string | null): Pr
 
 export async function submitReviewTask(
   taskId: number,
-  payload: { decision: string; matched_description: string; rate: number | null; reviewer_note: string },
+  payload: { decision: string; category_direction?: string; matched_description: string; rate: number | null; reviewer_note: string },
   token?: string | null,
 ): Promise<ReviewTask> {
   return apiFetch<ReviewTask>(`/review-tasks/${taskId}/submit`, {

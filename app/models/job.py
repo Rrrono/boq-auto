@@ -77,6 +77,7 @@ class ReviewTaskResponse(BaseModel):
     reviewer_uid: str = ""
     reviewer_email: str = ""
     submitted_decision: str = ""
+    submitted_category_direction: str = ""
     submitted_match_description: str = ""
     submitted_rate: float | None = None
     reviewer_note: str = ""
@@ -124,6 +125,7 @@ class ReviewTaskBridgeSyncResponse(BaseModel):
 
 class ReviewTaskSubmissionRequest(BaseModel):
     decision: str = Field(min_length=1, max_length=32)
+    category_direction: str = Field(default="", max_length=128)
     matched_description: str = Field(default="", max_length=2000)
     rate: float | None = None
     reviewer_note: str = Field(default="", max_length=4000)

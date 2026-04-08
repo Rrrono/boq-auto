@@ -22,6 +22,7 @@ function formatReason(reason: string) {
 
 type ReviewDraft = {
   decision: string;
+  category_direction: string;
   matched_description: string;
   rate: string;
   reviewer_note: string;
@@ -107,6 +108,7 @@ export default function ReviewTasksPage() {
   function getDraft(task: ReviewTask): ReviewDraft {
     return drafts[task.id] ?? {
       decision: task.decision === "unmatched" ? "manual_rate" : "confirm_match",
+      category_direction: task.submitted_category_direction || task.focus_area || "",
       matched_description: task.matched_description,
       rate: "",
       reviewer_note: "",
@@ -171,6 +173,7 @@ export default function ReviewTasksPage() {
         task.id,
         {
           decision: draft.decision,
+          category_direction: draft.category_direction,
           matched_description: draft.matched_description,
           rate: draft.rate.trim() ? Number(draft.rate) : null,
           reviewer_note: draft.reviewer_note,
@@ -476,6 +479,21 @@ export default function ReviewTasksPage() {
                         </select>
                       </label>
                       <label>
+                        Category direction
+                        <input
+                          type="text"
+                          value={draft.category_direction}
+                          onChange={(event) =>
+                            setDrafts((current) => ({
+                              ...current,
+                              [task.id]: { ...draft, category_direction: event.target.value },
+                            }))
+                          }
+                          disabled={task.status === "submitted"}
+                          placeholder="survey, plant_transport, pipes_fluids, electrical_support"
+                        />
+                      </label>
+                      <label>
                         Match description
                         <input
                           type="text"
@@ -519,7 +537,10 @@ export default function ReviewTasksPage() {
                         />
                       </label>
                       {task.status === "submitted" ? (
-                        <p className="helperText">Submitted {task.submitted_at ? new Date(task.submitted_at).toLocaleString() : ""}</p>
+                        <p className="helperText">
+                          Submitted {task.submitted_at ? new Date(task.submitted_at).toLocaleString() : ""}
+                          {task.submitted_category_direction ? ` - category direction ${task.submitted_category_direction.replaceAll("_", " ")}` : ""}
+                        </p>
                       ) : (
                         <button type="submit" disabled={savingTaskId === task.id}>
                           {savingTaskId === task.id ? "Submitting..." : "Submit review"}

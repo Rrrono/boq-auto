@@ -171,6 +171,7 @@ def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
         reviewer_uid=task.reviewer_uid,
         reviewer_email=task.reviewer_email,
         submitted_decision=task.submitted_decision,
+        submitted_category_direction=task.submitted_category_direction,
         submitted_match_description=task.submitted_match_description,
         submitted_rate=task.submitted_rate,
         reviewer_note=task.reviewer_note,
@@ -281,6 +282,7 @@ def submit_review_task(
     reviewer_email: str | None,
     *,
     decision: str,
+    category_direction: str,
     matched_description: str,
     rate: float | None,
     reviewer_note: str,
@@ -289,6 +291,7 @@ def submit_review_task(
     task.reviewer_uid = reviewer_uid
     task.reviewer_email = reviewer_email or ""
     task.submitted_decision = decision.strip().lower()
+    task.submitted_category_direction = category_direction.strip().lower().replace(" ", "_")
     task.submitted_match_description = matched_description.strip()
     task.submitted_rate = rate
     task.reviewer_note = reviewer_note.strip()
@@ -384,6 +387,8 @@ def _promotion_plan(task: ReviewTask, qa_status: str) -> tuple[str, str, str]:
             return "match_feedback", "logged", "accepted"
         if submitted_decision == "confirm_match" and task.submitted_match_description and task.submitted_match_description != task.matched_description:
             return "alias_suggestion", "ready", ""
+        if submitted_decision == "category_direction":
+            return "candidate_review", "ready", ""
         if submitted_decision == "manual_rate":
             return "rate_observation", "ready", "rejected"
         if submitted_decision == "no_good_match":
@@ -429,6 +434,7 @@ def _persist_promotion_artifact(task: ReviewTask, reviewer_email: str | None) ->
         "source_row_key": task.source_row_key,
         "task_id": task.id,
         "decision": task.submitted_decision,
+        "category_direction": task.submitted_category_direction,
         "qa_status": task.qa_status,
         "matched_item_code": task.matched_item_code,
     }
@@ -451,7 +457,7 @@ def _persist_promotion_artifact(task: ReviewTask, reviewer_email: str | None) ->
             task.description,
             task.submitted_match_description or task.matched_description,
             task.unit,
-            reason=task.qa_note or task.reviewer_note or "review_required",
+            reason=task.submitted_category_direction or task.qa_note or task.reviewer_note or "review_required",
             reviewer=reviewer,
             status="pending",
             metadata=metadata,

@@ -89,6 +89,7 @@ class ReviewTask(Base):
     reviewer_uid: Mapped[str] = mapped_column(String(128), default="", nullable=False)
     reviewer_email: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     submitted_decision: Mapped[str] = mapped_column(String(32), default="", nullable=False)
+    submitted_category_direction: Mapped[str] = mapped_column(String(128), default="", nullable=False)
     submitted_match_description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     submitted_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
     reviewer_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
