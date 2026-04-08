@@ -166,6 +166,27 @@ export type ReviewTaskSyncResponse = {
   tasks: ReviewTask[];
 };
 
+export type ReviewTaskBridgeSummary = {
+  available: boolean;
+  workbook_path: string;
+  schema_path: string;
+  rate_observations: number;
+  alias_suggestions: number;
+  candidate_review_records: number;
+  synced_candidate_rows: number;
+  pending_workbook_candidates: number;
+};
+
+export type ReviewTaskBridgeSyncResponse = {
+  available: boolean;
+  workbook_path: string;
+  schema_path: string;
+  synced_count: number;
+  skipped_duplicates: number;
+  review_report_rows: number;
+  bridge: ReviewTaskBridgeSummary;
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -332,5 +353,16 @@ export async function qaReviewTask(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function getReviewTaskBridgeSummary(token?: string | null): Promise<ReviewTaskBridgeSummary> {
+  return apiFetch<ReviewTaskBridgeSummary>("/review-tasks/bridge", { token });
+}
+
+export async function syncReviewTaskBridge(token?: string | null): Promise<ReviewTaskBridgeSyncResponse> {
+  return apiFetch<ReviewTaskBridgeSyncResponse>("/review-tasks/bridge/sync", {
+    token,
+    method: "POST",
   });
 }

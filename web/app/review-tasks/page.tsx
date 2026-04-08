@@ -5,11 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "../../components/auth-provider";
 import {
+  type ReviewTaskBridgeSummary,
   type ReviewTask,
   claimReviewTask,
+  getReviewTaskBridgeSummary,
   getErrorMessage,
   listReviewTasks,
   qaReviewTask,
+  syncReviewTaskBridge,
   submitReviewTask,
 } from "../../lib/platform-api";
 
@@ -31,11 +34,14 @@ export default function ReviewTasksPage() {
   const [tasks, setTasks] = useState<ReviewTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [tasksError, setTasksError] = useState("");
+  const [bridge, setBridge] = useState<ReviewTaskBridgeSummary | null>(null);
+  const [bridgeError, setBridgeError] = useState("");
   const [statusFilter, setStatusFilter] = useState("open");
   const [qaFilter, setQaFilter] = useState("");
   const [promotionFilter, setPromotionFilter] = useState("");
   const [mineOnly, setMineOnly] = useState(false);
   const [savingTaskId, setSavingTaskId] = useState<number | null>(null);
+  const [syncingBridge, setSyncingBridge] = useState(false);
   const [drafts, setDrafts] = useState<Record<number, ReviewDraft>>({});
 
   useEffect(() => {
@@ -61,10 +67,17 @@ export default function ReviewTasksPage() {
         if (!cancelled) {
           setTasks(nextTasks);
         }
+        const bridgeSummary = await getReviewTaskBridgeSummary(token);
+        if (!cancelled) {
+          setBridge(bridgeSummary);
+          setBridgeError("");
+        }
       } catch (error) {
         if (!cancelled) {
           setTasks([]);
           setTasksError(getErrorMessage(error, "The reviewer task queue could not be loaded."));
+          setBridge(null);
+          setBridgeError(getErrorMessage(error, "The learning bridge summary could not be loaded."));
         }
       } finally {
         if (!cancelled) {
@@ -114,6 +127,24 @@ export default function ReviewTasksPage() {
       token,
     );
     setTasks(nextTasks);
+    const bridgeSummary = await getReviewTaskBridgeSummary(token);
+    setBridge(bridgeSummary);
+  }
+
+  async function onSyncBridge() {
+    setSyncingBridge(true);
+    setBridgeError("");
+    setTasksError("");
+    try {
+      const token = await getIdToken();
+      const response = await syncReviewTaskBridge(token);
+      setBridge(response.bridge);
+      await refreshTasks();
+    } catch (error) {
+      setBridgeError(getErrorMessage(error, "The workbook bridge could not be synced."));
+    } finally {
+      setSyncingBridge(false);
+    }
   }
 
   async function onClaim(taskId: number) {
@@ -223,6 +254,57 @@ export default function ReviewTasksPage() {
           <strong>Queue scope</strong>
           <span>{mineOnly ? "My tasks only" : "Shared queue"}</span>
         </div>
+      </section>
+
+      <section className="card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <span className="pill">Learning Bridge</span>
+            <h3>Reviewer artifacts to workbook review</h3>
+            <p className="helperText" style={{ marginTop: 8 }}>
+              Approved reviewer outcomes first land in the normalized sidecar, then this bridge syncs them back into
+              workbook-era <span className="monoText">CandidateMatches</span> so the older promotion commands keep working.
+            </p>
+          </div>
+          <button type="button" onClick={() => void onSyncBridge()} disabled={syncingBridge || !bridge?.available}>
+            {syncingBridge ? "Syncing bridge..." : "Sync to workbook review"}
+          </button>
+        </div>
+        {bridgeError ? <p className="helperText" style={{ color: "var(--danger)" }}>{bridgeError}</p> : null}
+        {!bridge?.available ? (
+          <div className="emptyState">The bridge is not available until the API can see both the production workbook and normalized schema.</div>
+        ) : (
+          <>
+            <div className="metaGrid">
+              <div className="metaRow">
+                <strong>Rate observations</strong>
+                <span>{bridge.rate_observations}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Alias suggestions</strong>
+                <span>{bridge.alias_suggestions}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Candidate review records</strong>
+                <span>{bridge.candidate_review_records}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Synced candidate rows</strong>
+                <span>{bridge.synced_candidate_rows}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Pending workbook candidates</strong>
+                <span>{bridge.pending_workbook_candidates}</span>
+              </div>
+            </div>
+            <p className="helperText">
+              Workbook: <span className="monoText">{bridge.workbook_path}</span>
+            </p>
+            <p className="helperText">
+              Schema: <span className="monoText">{bridge.schema_path}</span>
+            </p>
+          </>
+        )}
       </section>
 
       <section className="card">

@@ -213,9 +213,18 @@ Recent uncommitted work in the current checkpoint:
   - hosted reviewer task approval writes normalized artifacts
   - `sync-review-artifacts` materializes them into `CandidateMatches`
   - existing workbook review/promotion commands can continue from there
+- that follow-up hosted bridge slice now exists:
+  - `GET /review-tasks/bridge` returns normalized artifact counts plus synced workbook bridge counts
+  - `POST /review-tasks/bridge/sync` runs the sync into `CandidateMatches` and refreshes `Candidate Review`
+  - the hosted reviewer page now shows the bridge summary and a sync action
+  - this makes the reviewer-learning bridge visible in the web workflow instead of CLI-only
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
+  - the hosted bridge API slice was verified with:
+    - a direct FastAPI `TestClient` smoke script covering `/review-tasks/bridge` and `/review-tasks/bridge/sync`
+    - successful `npm run build` in `web/`
+    - successful `py_compile` of the touched backend Python modules
 
 ## Deployment Rules
 

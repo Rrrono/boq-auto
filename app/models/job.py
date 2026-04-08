@@ -99,6 +99,27 @@ class ReviewTaskSyncResponse(BaseModel):
     tasks: list[ReviewTaskResponse] = Field(default_factory=list)
 
 
+class ReviewTaskBridgeSummaryResponse(BaseModel):
+    available: bool
+    workbook_path: str = ""
+    schema_path: str = ""
+    rate_observations: int = 0
+    alias_suggestions: int = 0
+    candidate_review_records: int = 0
+    synced_candidate_rows: int = 0
+    pending_workbook_candidates: int = 0
+
+
+class ReviewTaskBridgeSyncResponse(BaseModel):
+    available: bool
+    workbook_path: str = ""
+    schema_path: str = ""
+    synced_count: int = 0
+    skipped_duplicates: int = 0
+    review_report_rows: int = 0
+    bridge: ReviewTaskBridgeSummaryResponse
+
+
 class ReviewTaskSubmissionRequest(BaseModel):
     decision: str = Field(min_length=1, max_length=32)
     matched_description: str = Field(default="", max_length=2000)

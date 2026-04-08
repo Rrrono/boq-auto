@@ -9,11 +9,13 @@ import os
 
 from sqlalchemy.orm import Session
 
-from app.models.job import ReviewTaskResponse, ReviewTaskSyncResponse
+from app.models.job import ReviewTaskBridgeSummaryResponse, ReviewTaskBridgeSyncResponse, ReviewTaskResponse, ReviewTaskSyncResponse
 from app.orm_models import Job, JobRun, ReviewTask
 from src.config_loader import load_config
 from src.cost_schema import CostDatabase, schema_database_path
+from src.ingestion import candidate_positions, generate_review_report, sync_review_artifacts_to_candidate_matches
 from src.release_manager import current_production_database_path
+from openpyxl import load_workbook
 
 
 def _row_key(item: dict) -> str:
@@ -254,6 +256,82 @@ def _resolve_schema_database_path() -> Path | None:
     if not db_path.exists():
         return None
     return schema_database_path(db_path)
+
+
+def _resolve_workbook_database_path() -> Path | None:
+    override = os.getenv("BOQ_AUTO_API_DB_PATH", "").strip()
+    if override:
+        return Path(override)
+    config = load_config()
+    db_path = current_production_database_path(config)
+    if not db_path.exists():
+        return None
+    return db_path
+
+
+def _count_synced_candidate_rows(workbook_path: Path) -> tuple[int, int]:
+    if not workbook_path.exists():
+        return 0, 0
+    workbook = load_workbook(workbook_path)
+    if "CandidateMatches" not in workbook.sheetnames:
+        return 0, 0
+    sheet = workbook["CandidateMatches"]
+    positions = candidate_positions(sheet)
+    synced_count = 0
+    pending_count = 0
+    for row_number in range(2, sheet.max_row + 1):
+        source_file = str(sheet.cell(row_number, positions["source_file"]).value or "").strip() if "source_file" in positions else ""
+        if source_file.startswith("schema-task:"):
+            synced_count += 1
+            reviewer_status = str(sheet.cell(row_number, positions["reviewer_status"]).value or "").strip().lower() if "reviewer_status" in positions else ""
+            promotion_status = str(sheet.cell(row_number, positions["promotion_status"]).value or "").strip().lower() if "promotion_status" in positions else ""
+            if reviewer_status == "pending" or promotion_status in {"not_promoted", "pending"}:
+                pending_count += 1
+    return synced_count, pending_count
+
+
+def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
+    workbook_path = _resolve_workbook_database_path()
+    schema_path = _resolve_schema_database_path()
+    if workbook_path is None or schema_path is None or not schema_path.exists():
+        return ReviewTaskBridgeSummaryResponse(available=False)
+
+    repository = CostDatabase(schema_path)
+    synced_candidate_rows, pending_workbook_candidates = _count_synced_candidate_rows(workbook_path)
+    return ReviewTaskBridgeSummaryResponse(
+        available=True,
+        workbook_path=str(workbook_path),
+        schema_path=str(schema_path),
+        rate_observations=len(repository.fetch_rate_observations()),
+        alias_suggestions=len(repository.fetch_alias_suggestions()),
+        candidate_review_records=len(repository.fetch_candidate_reviews()),
+        synced_candidate_rows=synced_candidate_rows,
+        pending_workbook_candidates=pending_workbook_candidates,
+    )
+
+
+def sync_review_task_bridge(*, refresh_review_report: bool = True) -> ReviewTaskBridgeSyncResponse:
+    workbook_path = _resolve_workbook_database_path()
+    schema_path = _resolve_schema_database_path()
+    if workbook_path is None or schema_path is None or not schema_path.exists():
+        summary = get_review_task_bridge_summary()
+        return ReviewTaskBridgeSyncResponse(available=False, bridge=summary)
+
+    sync_summary = sync_review_artifacts_to_candidate_matches(str(workbook_path), str(schema_path))
+    review_report_rows = 0
+    if refresh_review_report:
+        report_summary = generate_review_report(str(workbook_path))
+        review_report_rows = report_summary.report_rows
+    bridge = get_review_task_bridge_summary()
+    return ReviewTaskBridgeSyncResponse(
+        available=True,
+        workbook_path=str(workbook_path),
+        schema_path=str(schema_path),
+        synced_count=sync_summary.appended,
+        skipped_duplicates=sync_summary.skipped_duplicates,
+        review_report_rows=review_report_rows,
+        bridge=bridge,
+    )
 
 
 def _promotion_plan(task: ReviewTask, qa_status: str) -> tuple[str, str, str]:

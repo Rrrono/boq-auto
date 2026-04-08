@@ -379,3 +379,48 @@ def test_unmatched_rows_create_manual_rate_tasks() -> None:
     assert tasks
     assert any(task["task_question"] for task in tasks)
     assert any(task["response_schema"] for task in tasks)
+
+
+def test_review_task_bridge_summary_and_sync_endpoint(tmp_path) -> None:
+    schema_source = tmp_path / "runtime_master.xlsx"
+    _build_runtime_database(schema_source)
+    os.environ["BOQ_AUTO_API_DB_PATH"] = str(schema_source)
+    repository = CostDatabase(schema_source)
+    repository.record_rate_observation(
+        "Crawler excavator hire",
+        "Crawler excavator hire",
+        "day",
+        26500.0,
+        source="review_task",
+        reviewer="Senior QS",
+        metadata={"task_id": "task-rate-bridge", "section": "Dayworks", "region": "Nyanza"},
+    )
+    repository.record_alias_suggestion(
+        "Vibrating roller",
+        "Vibratory roller",
+        section_bias="Roadworks",
+        reviewer="Senior QS",
+        status="approved",
+        metadata={"task_id": "task-alias-bridge"},
+    )
+
+    summary_response = client.get("/review-tasks/bridge")
+    assert summary_response.status_code == 200
+    summary_body = summary_response.json()
+    assert summary_body["available"] is True
+    assert summary_body["rate_observations"] >= 1
+    assert summary_body["alias_suggestions"] >= 1
+
+    sync_response = client.post("/review-tasks/bridge/sync")
+    assert sync_response.status_code == 200
+    sync_body = sync_response.json()
+    assert sync_body["available"] is True
+    assert sync_body["synced_count"] >= 2
+    assert sync_body["bridge"]["synced_candidate_rows"] >= 2
+    assert sync_body["review_report_rows"] >= 2
+
+    workbook = load_workbook(schema_source)
+    candidate_sheet = workbook["CandidateMatches"]
+    source_markers = [str(row[2] or "") for row in candidate_sheet.iter_rows(min_row=2, values_only=True)]
+    assert "schema-task:task-rate-bridge" in source_markers
+    assert "schema-task:task-alias-bridge" in source_markers

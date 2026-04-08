@@ -7,15 +7,24 @@ from sqlalchemy.orm import Session
 
 from app.auth import AuthenticatedUser, require_authenticated_user
 from app.db import get_db
-from app.models.job import ReviewTaskQaRequest, ReviewTaskResponse, ReviewTaskSubmissionRequest, ReviewTaskSyncResponse
+from app.models.job import (
+    ReviewTaskBridgeSummaryResponse,
+    ReviewTaskBridgeSyncResponse,
+    ReviewTaskQaRequest,
+    ReviewTaskResponse,
+    ReviewTaskSubmissionRequest,
+    ReviewTaskSyncResponse,
+)
 from app.services.jobs import get_job
 from app.services.review_tasks import (
     claim_review_task,
+    get_review_task_bridge_summary,
     get_review_task,
     list_review_tasks,
     qa_review_task,
     serialize_review_task,
     submit_review_task,
+    sync_review_task_bridge,
     sync_review_tasks_for_job,
 )
 
@@ -39,6 +48,20 @@ def list_review_tasks_endpoint(
     if promotion_status:
         tasks = [task for task in tasks if task.promotion_status == promotion_status]
     return [serialize_review_task(task) for task in tasks]
+
+
+@router.get("/review-tasks/bridge", response_model=ReviewTaskBridgeSummaryResponse)
+def review_task_bridge_summary_endpoint(
+    _: AuthenticatedUser = Depends(require_authenticated_user),
+) -> ReviewTaskBridgeSummaryResponse:
+    return get_review_task_bridge_summary()
+
+
+@router.post("/review-tasks/bridge/sync", response_model=ReviewTaskBridgeSyncResponse)
+def review_task_bridge_sync_endpoint(
+    _: AuthenticatedUser = Depends(require_authenticated_user),
+) -> ReviewTaskBridgeSyncResponse:
+    return sync_review_task_bridge(refresh_review_report=True)
 
 
 @router.post("/jobs/{job_id}/review-tasks/sync", response_model=ReviewTaskSyncResponse)
