@@ -247,6 +247,13 @@ Recent uncommitted work in the current checkpoint:
   - the hosted reviewer workflow should summarize the strongest taxonomy backlog areas
   - this should group specialist reviewer work by submitted category direction or inferred focus area
   - the point is to make category-direction capture actionable for planning, not just storable in metadata
+- the latest hosted reviewer-page incident exposed an important runtime/UI distinction:
+  - `GET /review-tasks` can succeed while `GET /review-tasks/bridge` fails
+  - the concrete failure came from a missing runtime sidecar object:
+    - `gs://boq-auto-artifacts-project-05a5d388-27e0-4fe6-aa5/runtime/qs_database.sqlite`
+  - when that object was missing, Cloud Run returned `500` only for the bridge route while the queue route continued returning `200`
+  - the immediate operational fix was to upload the missing sidecar to the runtime bucket
+  - the frontend should therefore treat queue loading and bridge loading independently so bridge failures do not blank the whole reviewer page
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
@@ -328,6 +335,10 @@ Cloud SQL-backed web platform/API deployment depends on:
   - `BOQ_AUTO_API_DB_GCS_URI`
   - `BOQ_AUTO_API_DB_SIDECAR_GCS_URI`
 - if the workbook URI is set but the sidecar URI is missing, pricing can still work while the hosted learning bridge reports unavailable
+- the runtime bucket should contain both:
+  - `gs://boq-auto-artifacts-project-05a5d388-27e0-4fe6-aa5/runtime/qs_database.xlsx`
+  - `gs://boq-auto-artifacts-project-05a5d388-27e0-4fe6-aa5/runtime/qs_database.sqlite`
+- if the sidecar object is missing, reviewer queue calls may still work while bridge summary calls fail
 
 ## Current Priorities
 

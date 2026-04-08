@@ -45,6 +45,36 @@ export default function ReviewTasksPage() {
   const [syncingBridge, setSyncingBridge] = useState(false);
   const [drafts, setDrafts] = useState<Record<number, ReviewDraft>>({});
 
+  async function loadQueue(
+    token: string,
+    filters: {
+      status?: string;
+      qa_status?: string;
+      promotion_status?: string;
+      mine?: boolean;
+    },
+  ) {
+    const nextTasks = await listReviewTasks(filters, token);
+    setTasks(nextTasks);
+    setTasksError("");
+    return nextTasks;
+  }
+
+  async function loadBridge(token: string) {
+    const bridgeSummary = await getReviewTaskBridgeSummary(token);
+    setBridge(bridgeSummary);
+    setBridgeError("");
+    return bridgeSummary;
+  }
+
+  async function requireToken() {
+    const token = await getIdToken();
+    if (!token) {
+      throw new Error("A signed-in reviewer token is required.");
+    }
+    return token;
+  }
+
   useEffect(() => {
     if (loading || (configured && !user)) {
       return;
@@ -54,20 +84,26 @@ export default function ReviewTasksPage() {
     async function loadTasks() {
       setLoadingTasks(true);
       setTasksError("");
+      const filters = {
+        status: statusFilter || undefined,
+        qa_status: qaFilter || undefined,
+        promotion_status: promotionFilter || undefined,
+        mine: mineOnly,
+      };
+      const token = await requireToken();
       try {
-        const token = await getIdToken();
-        const nextTasks = await listReviewTasks(
-          {
-            status: statusFilter || undefined,
-            qa_status: qaFilter || undefined,
-            promotion_status: promotionFilter || undefined,
-            mine: mineOnly,
-          },
-          token,
-        );
+        const nextTasks = await listReviewTasks(filters, token);
         if (!cancelled) {
           setTasks(nextTasks);
+          setTasksError("");
         }
+      } catch (error) {
+        if (!cancelled) {
+          setTasks([]);
+          setTasksError(getErrorMessage(error, "The reviewer task queue could not be loaded."));
+        }
+      }
+      try {
         const bridgeSummary = await getReviewTaskBridgeSummary(token);
         if (!cancelled) {
           setBridge(bridgeSummary);
@@ -75,8 +111,6 @@ export default function ReviewTasksPage() {
         }
       } catch (error) {
         if (!cancelled) {
-          setTasks([]);
-          setTasksError(getErrorMessage(error, "The reviewer task queue could not be loaded."));
           setBridge(null);
           setBridgeError(getErrorMessage(error, "The learning bridge summary could not be loaded."));
         }
@@ -118,29 +152,30 @@ export default function ReviewTasksPage() {
   }
 
   async function refreshTasks() {
-    const token = await getIdToken();
-    const nextTasks = await listReviewTasks(
-      {
-        status: statusFilter || undefined,
-        qa_status: qaFilter || undefined,
-        promotion_status: promotionFilter || undefined,
-        mine: mineOnly,
-      },
-      token,
-    );
-    setTasks(nextTasks);
-    const bridgeSummary = await getReviewTaskBridgeSummary(token);
-    setBridge(bridgeSummary);
+    const token = await requireToken();
+    const filters = {
+      status: statusFilter || undefined,
+      qa_status: qaFilter || undefined,
+      promotion_status: promotionFilter || undefined,
+      mine: mineOnly,
+    };
+    await loadQueue(token, filters);
+    try {
+      await loadBridge(token);
+    } catch (error) {
+      setBridge(null);
+      setBridgeError(getErrorMessage(error, "The learning bridge summary could not be loaded."));
+    }
   }
 
   async function onSyncBridge() {
     setSyncingBridge(true);
     setBridgeError("");
-    setTasksError("");
     try {
-      const token = await getIdToken();
+      const token = await requireToken();
       const response = await syncReviewTaskBridge(token);
       setBridge(response.bridge);
+      setBridgeError("");
       await refreshTasks();
     } catch (error) {
       setBridgeError(getErrorMessage(error, "The workbook bridge could not be synced."));
@@ -153,7 +188,7 @@ export default function ReviewTasksPage() {
     setSavingTaskId(taskId);
     setTasksError("");
     try {
-      const token = await getIdToken();
+      const token = await requireToken();
       await claimReviewTask(taskId, token);
       await refreshTasks();
     } catch (error) {
@@ -168,7 +203,7 @@ export default function ReviewTasksPage() {
     setSavingTaskId(task.id);
     setTasksError("");
     try {
-      const token = await getIdToken();
+      const token = await requireToken();
       await submitReviewTask(
         task.id,
         {
@@ -193,7 +228,7 @@ export default function ReviewTasksPage() {
     setSavingTaskId(task.id);
     setTasksError("");
     try {
-      const token = await getIdToken();
+      const token = await requireToken();
       await qaReviewTask(
         task.id,
         {
