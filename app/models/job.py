@@ -65,6 +65,8 @@ class ReviewTaskResponse(BaseModel):
     matched_description: str
     matched_item_code: str = ""
     task_type: str = "match_confirmation"
+    focus_area: str = ""
+    specialist_gap_flag: bool = False
     task_question: str = ""
     response_schema: list[str] = Field(default_factory=list)
     unit: str

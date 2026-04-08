@@ -34,7 +34,27 @@ def _response_schema(*choices: str) -> list[str]:
     return [choice for choice in choices if choice]
 
 
-def _task_blueprint(item: dict) -> tuple[str, str, list[str]]:
+def _focus_area(item: dict) -> tuple[str, bool]:
+    description = str(item.get("description") or "").strip().lower()
+    flag_reasons = [str(reason).strip().lower() for reason in item.get("flag_reasons") or [] if str(reason).strip()]
+    if any(keyword in description for keyword in {"survey", "theodolite", "level", "chainage"}):
+        return "survey", True
+    if any(keyword in description for keyword in {"laboratory", "lab", "sieve", "mould", "cube test"}):
+        return "lab_testing", True
+    if any(keyword in description for keyword in {"chair", "desk", "cupboard", "table", "bed", "wardrobe"}):
+        return "furniture_accommodation", True
+    if any(keyword in description for keyword in {"cable", "conduit", "transformer", "lighting", "electrical"}):
+        return "electrical_support", True
+    if any(keyword in description for keyword in {"pipe", "valve", "manhole", "culvert", "sewer", "drain"}):
+        return "pipes_fluids", True
+    if any(keyword in description for keyword in {"grader", "roller", "tipper", "excavator", "paver", "compactor"}):
+        return "plant_transport", True
+    if "category_mismatch" in flag_reasons or "section_mismatch" in flag_reasons or "generic_match" in flag_reasons:
+        return "general_gap", True
+    return "", False
+
+
+def _task_blueprint(item: dict) -> tuple[str, str, list[str], str, bool]:
     decision = str(item.get("decision") or "").strip().lower()
     description = str(item.get("description") or "").strip() or "this BOQ line"
     unit = str(item.get("unit") or "").strip()
@@ -43,12 +63,33 @@ def _task_blueprint(item: dict) -> tuple[str, str, list[str]]:
     flag_reasons = [str(reason).strip().lower() for reason in item.get("flag_reasons") or [] if str(reason).strip()]
     category_mismatch = bool(item.get("category_mismatch_flag") or False)
     section_mismatch = bool(item.get("section_mismatch_flag") or False)
+    focus_area, specialist_gap_flag = _focus_area(item)
+
+    if specialist_gap_flag and decision == "unmatched":
+        return (
+            "specialist_rate_entry",
+            f"The engine could not place '{description}' into a reliable {focus_area.replace('_', ' ') if focus_area else 'specialist'} bucket. Confirm the category direction first, then enter a practical rate for {unit or 'the required unit'} or keep it unmatched.",
+            _response_schema("category_direction", "manual_rate", "no_good_match", "matched_description", "reviewer_note"),
+            focus_area,
+            True,
+        )
+
+    if specialist_gap_flag and (category_mismatch or section_mismatch or confidence_band in {"low", "very_low"}):
+        return (
+            "specialist_classification",
+            f"'{description}' looks like a {focus_area.replace('_', ' ') if focus_area else 'specialist'} knowledge gap. Describe the right category direction and only keep the current match if it is genuinely valid.",
+            _response_schema("confirm_match", "category_direction", "manual_rate", "no_good_match", "matched_description", "reviewer_note"),
+            focus_area,
+            True,
+        )
 
     if decision == "unmatched":
         return (
             "manual_rate_entry",
             f"No acceptable library match was found for '{description}'. Enter a practical rate for {unit or 'the required unit'} or confirm that the item should remain unmatched.",
             _response_schema("manual_rate", "no_good_match", "reviewer_note"),
+            focus_area,
+            specialist_gap_flag,
         )
 
     if category_mismatch or any("category" in reason for reason in flag_reasons):
@@ -56,6 +97,8 @@ def _task_blueprint(item: dict) -> tuple[str, str, list[str]]:
             "category_classification",
             f"The engine suspects a category mismatch for '{description}'. Decide whether the current match belongs to the right work family or describe the correct category direction.",
             _response_schema("confirm_match", "no_good_match", "matched_description", "reviewer_note"),
+            focus_area,
+            specialist_gap_flag,
         )
 
     if section_mismatch or any("section" in reason for reason in flag_reasons):
@@ -63,6 +106,8 @@ def _task_blueprint(item: dict) -> tuple[str, str, list[str]]:
             "section_alignment",
             f"The row '{description}' may belong to a different section than the current suggestion. Confirm the match only if the section context is still valid.",
             _response_schema("confirm_match", "no_good_match", "matched_description", "reviewer_note"),
+            focus_area,
+            specialist_gap_flag,
         )
 
     if not matched_description or confidence_band in {"very_low", "low"}:
@@ -70,12 +115,16 @@ def _task_blueprint(item: dict) -> tuple[str, str, list[str]]:
             "candidate_selection",
             f"Review the weak match for '{description}' and decide whether to keep the current suggestion or replace it with a better description/rate.",
             _response_schema("confirm_match", "manual_rate", "no_good_match", "matched_description", "reviewer_note"),
+            focus_area,
+            specialist_gap_flag,
         )
 
     return (
         "match_confirmation",
         f"Confirm whether '{matched_description}' is an acceptable match for '{description}' in {unit or 'the stated'} unit.",
         _response_schema("confirm_match", "manual_rate", "no_good_match", "reviewer_note"),
+        focus_area,
+        specialist_gap_flag,
     )
 
 
@@ -98,6 +147,20 @@ def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
         matched_description=task.matched_description,
         matched_item_code=task.matched_item_code,
         task_type=task.task_type,
+        focus_area=_focus_area(
+            {
+                "description": task.description,
+                "flag_reasons": flag_reasons,
+                "decision": task.decision,
+            }
+        )[0],
+        specialist_gap_flag=_focus_area(
+            {
+                "description": task.description,
+                "flag_reasons": flag_reasons,
+                "decision": task.decision,
+            }
+        )[1],
         task_question=task.task_question,
         response_schema=[str(value) for value in response_schema],
         unit=task.unit,
@@ -162,7 +225,7 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
         task.description = str(item.get("description") or "")
         task.matched_description = str(item.get("matched_description") or "")
         task.matched_item_code = str(item.get("matched_item_code") or "")
-        task.task_type, task.task_question, response_schema = _task_blueprint(item)
+        task.task_type, task.task_question, response_schema, _focus_area_label, _specialist_gap_flag = _task_blueprint(item)
         task.response_schema_json = json.dumps(response_schema, ensure_ascii=True)
         task.unit = str(item.get("unit") or "")
         task.decision = str(item.get("decision") or "review")

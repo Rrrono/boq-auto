@@ -134,6 +134,8 @@ export type ReviewTask = {
   matched_description: string;
   matched_item_code: string;
   task_type: string;
+  focus_area: string;
+  specialist_gap_flag: boolean;
   task_question: string;
   response_schema: string[];
   unit: string;

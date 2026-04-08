@@ -380,6 +380,10 @@ export default function ReviewTasksPage() {
                       <span>{task.task_type.replaceAll("_", " ")}</span>
                     </div>
                     <div className="metaRow">
+                      <strong>Focus area</strong>
+                      <span>{task.focus_area ? task.focus_area.replaceAll("_", " ") : "-"}</span>
+                    </div>
+                    <div className="metaRow">
                       <strong>Engine decision</strong>
                       <span>{task.decision}</span>
                     </div>
@@ -411,6 +415,11 @@ export default function ReviewTasksPage() {
 
                   <div className="card" style={{ marginTop: 14 }}>
                     <span className="pill">Reviewer brief</span>
+                    {task.specialist_gap_flag ? (
+                      <p className="helperText" style={{ marginTop: 8 }}>
+                        This task is being treated as a specialist knowledge gap, not just a weak price lookup.
+                      </p>
+                    ) : null}
                     <p className="helperText" style={{ marginTop: 8 }}>{task.task_question}</p>
                     {task.response_schema.length > 0 ? (
                       <div className="reasonList" style={{ marginTop: 10 }}>

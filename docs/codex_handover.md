@@ -229,8 +229,15 @@ Recent uncommitted work in the current checkpoint:
     1. under-modeled specialist domains and work families
     2. thin specialist candidate coverage
     3. bad fallback display in review-facing UI even when the engine is correctly uncertain
-  - the immediate next slice should suppress obviously absurd fallback matches from the hosted insights views while preserving the raw `matched_description` for audit/debug paths
-  - after that, the stronger long-term fix remains taxonomy-first knowledge growth for specialist domains rather than matcher-only tuning
+- the immediate next slice should suppress obviously absurd fallback matches from the hosted insights views while preserving the raw `matched_description` for audit/debug paths
+- after that, the stronger long-term fix remains taxonomy-first knowledge growth for specialist domains rather than matcher-only tuning
+- the follow-on slice after suppressing absurd fallback display should improve reviewer-task generation itself:
+  - weak specialist rows should not just become generic `manual_rate_entry` tasks
+  - they should carry a `focus_area` and a more explicit engine brief so reviewers know whether the real need is:
+    - specialist classification
+    - domain-aware manual rate entry
+    - category direction correction
+  - this keeps the marketplace/reviewer path aligned with the real knowledge gap instead of pretending every specialist miss is only a pricing problem
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit

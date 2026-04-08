@@ -40,6 +40,17 @@ def _build_unmatched_workbook_bytes() -> bytes:
     return stream.getvalue()
 
 
+def _build_specialist_gap_workbook_bytes() -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "BOQ"
+    sheet.append(["Description", "Unit", "Quantity"])
+    sheet.append(["Survey Equipment", "Lump Sum", 1])
+    stream = BytesIO()
+    workbook.save(stream)
+    return stream.getvalue()
+
+
 def _build_runtime_database(path: Path) -> None:
     workbook = Workbook()
     sheet = workbook.active
@@ -161,9 +172,11 @@ def test_sync_claim_and_submit_review_tasks() -> None:
     sync_body = sync_response.json()
     assert sync_body["job_id"] == job_id
     assert "tasks" in sync_body
-    assert sync_body["tasks"][0]["task_type"] in {"candidate_selection", "match_confirmation", "manual_rate_entry", "category_classification", "section_alignment"}
+    assert sync_body["tasks"][0]["task_type"] in {"candidate_selection", "match_confirmation", "manual_rate_entry", "category_classification", "section_alignment", "specialist_classification", "specialist_rate_entry"}
     assert sync_body["tasks"][0]["task_question"]
     assert isinstance(sync_body["tasks"][0]["response_schema"], list)
+    assert "focus_area" in sync_body["tasks"][0]
+    assert "specialist_gap_flag" in sync_body["tasks"][0]
 
     tasks_response = client.get("/review-tasks")
     assert tasks_response.status_code == 200
@@ -381,6 +394,31 @@ def test_unmatched_rows_create_manual_rate_tasks() -> None:
     assert tasks
     assert any(task["task_question"] for task in tasks)
     assert any(task["response_schema"] for task in tasks)
+
+
+def test_specialist_gap_rows_create_specialist_task_types() -> None:
+    create_response = client.post("/jobs", json={"title": "Specialist Gap Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    upload_response = client.post(
+        f"/jobs/{job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("survey.xlsx", _build_specialist_gap_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert upload_response.status_code == 200
+
+    price_response = client.post(f"/jobs/{job_id}/price-boq")
+    assert price_response.status_code == 200
+
+    sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    assert sync_response.status_code == 200
+    tasks = sync_response.json()["tasks"]
+    assert tasks
+    specialist_tasks = [task for task in tasks if task["specialist_gap_flag"]]
+    assert specialist_tasks
+    assert specialist_tasks[0]["task_type"] in {"specialist_classification", "specialist_rate_entry"}
+    assert specialist_tasks[0]["focus_area"] in {"survey", "general_gap"}
+    assert "category_direction" in specialist_tasks[0]["response_schema"]
 
 
 def test_review_task_bridge_summary_and_sync_endpoint(tmp_path) -> None:
