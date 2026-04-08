@@ -282,6 +282,47 @@ def claim_review_task(db: Session, task: ReviewTask, reviewer_uid: str, reviewer
     return task
 
 
+def bulk_claim_review_tasks(
+    db: Session,
+    task_ids: list[int],
+    *,
+    reviewer_uid: str,
+    reviewer_email: str | None,
+) -> tuple[list[ReviewTask], int]:
+    if not task_ids:
+        return [], 0
+
+    tasks = list(
+        db.query(ReviewTask)
+        .filter(ReviewTask.id.in_(task_ids))
+        .order_by(ReviewTask.updated_at.desc(), ReviewTask.created_at.desc())
+        .all()
+    )
+    claimed: list[ReviewTask] = []
+    skipped_count = 0
+    now = datetime.now(timezone.utc)
+
+    for task in tasks:
+        if task.status == "submitted":
+            skipped_count += 1
+            continue
+        if task.reviewer_uid and task.reviewer_uid != reviewer_uid and task.status == "claimed":
+            skipped_count += 1
+            continue
+        task.status = "claimed"
+        task.reviewer_uid = reviewer_uid
+        task.reviewer_email = reviewer_email or ""
+        task.updated_at = now
+        claimed.append(task)
+
+    db.commit()
+    for task in claimed:
+        db.refresh(task)
+    requested_count = len(task_ids)
+    skipped_count += max(0, requested_count - len(tasks))
+    return claimed, skipped_count
+
+
 def submit_review_task(
     db: Session,
     task: ReviewTask,

@@ -259,6 +259,11 @@ Recent uncommitted work in the current checkpoint:
   - the hosted reviewer page can now work the taxonomy backlog directly by clicking a backlog area
   - queue controls now support focus-area filtering, specialist-only filtering, and quick actions for promotion-ready or QA-ready work
   - this moves the backlog from a passive summary toward an operational triage surface
+- the next reviewer-operations slice now adds the first safe batch action:
+  - `POST /review-tasks/bulk/claim` claims multiple filtered open tasks at once
+  - submitted or already-claimed-by-other-reviewer tasks are skipped instead of forcing errors
+  - the hosted reviewer page now exposes a `Claim filtered open tasks` action for the current queue view
+  - this is intentionally conservative: batch claiming is allowed, but submission and QA still remain row-level
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
@@ -422,6 +427,7 @@ The next active slice after this handover update is:
 5. deepen task-type-driven reviewer questions so the engine can ask reviewers exactly what kind of decision is needed
 6. keep using `docs/codex_handover.md` as a checkpoint file whenever work is paused or handed over
 7. keep `scripts/deploy_all_cloudshell.sh` updated whenever runtime env vars or deploy assumptions change
+8. add the first safe bulk reviewer action so filtered backlog clusters can be claimed in batches without bypassing submission or QA
 
 ## Working Principles For The Next Codex
 

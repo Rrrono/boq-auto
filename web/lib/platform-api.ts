@@ -193,6 +193,13 @@ export type ReviewTaskBridgeSyncResponse = {
   bridge: ReviewTaskBridgeSummary;
 };
 
+export type ReviewTaskBulkClaimResponse = {
+  requested_count: number;
+  claimed_count: number;
+  skipped_count: number;
+  tasks: ReviewTask[];
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -339,6 +346,15 @@ export async function claimReviewTask(taskId: number, token?: string | null): Pr
   return apiFetch<ReviewTask>(`/review-tasks/${taskId}/claim`, {
     token,
     method: "POST",
+  });
+}
+
+export async function bulkClaimReviewTasks(taskIds: number[], token?: string | null): Promise<ReviewTaskBulkClaimResponse> {
+  return apiFetch<ReviewTaskBulkClaimResponse>("/review-tasks/bulk/claim", {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ task_ids: taskIds }),
   });
 }
 

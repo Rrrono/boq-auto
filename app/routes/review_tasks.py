@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.auth import AuthenticatedUser, require_authenticated_user
 from app.db import get_db
 from app.models.job import (
+    ReviewTaskBulkClaimRequest,
+    ReviewTaskBulkClaimResponse,
     ReviewTaskBridgeSummaryResponse,
     ReviewTaskBridgeSyncResponse,
     ReviewTaskQaRequest,
@@ -18,6 +20,7 @@ from app.models.job import (
 from app.services.jobs import get_job
 from app.services.review_tasks import (
     claim_review_task,
+    bulk_claim_review_tasks,
     get_review_task_bridge_summary,
     get_review_task,
     list_review_tasks,
@@ -56,6 +59,26 @@ def list_review_tasks_endpoint(
     if specialist_only:
         serialized = [task for task in serialized if task.specialist_gap_flag]
     return serialized
+
+
+@router.post("/review-tasks/bulk/claim", response_model=ReviewTaskBulkClaimResponse)
+def bulk_claim_review_tasks_endpoint(
+    payload: ReviewTaskBulkClaimRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> ReviewTaskBulkClaimResponse:
+    claimed, skipped_count = bulk_claim_review_tasks(
+        db,
+        payload.task_ids,
+        reviewer_uid=user.uid,
+        reviewer_email=user.email,
+    )
+    return ReviewTaskBulkClaimResponse(
+        requested_count=len(payload.task_ids),
+        claimed_count=len(claimed),
+        skipped_count=skipped_count,
+        tasks=[serialize_review_task(task) for task in claimed],
+    )
 
 
 @router.get("/review-tasks/bridge", response_model=ReviewTaskBridgeSummaryResponse)

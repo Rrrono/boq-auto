@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "../../components/auth-provider";
 import {
+  bulkClaimReviewTasks,
   type ReviewTaskBridgeSummary,
   type ReviewTask,
   claimReviewTask,
@@ -46,6 +47,7 @@ export default function ReviewTasksPage() {
   const [savingTaskId, setSavingTaskId] = useState<number | null>(null);
   const [syncingBridge, setSyncingBridge] = useState(false);
   const [drafts, setDrafts] = useState<Record<number, ReviewDraft>>({});
+  const [bulkActionMessage, setBulkActionMessage] = useState("");
 
   async function loadQueue(
     token: string,
@@ -163,6 +165,11 @@ export default function ReviewTasksPage() {
     return Array.from(labels).sort();
   }, [bridge?.taxonomy_backlog, tasks]);
 
+  const claimableTaskIds = useMemo(
+    () => tasks.filter((task) => task.status === "open").map((task) => task.id),
+    [tasks],
+  );
+
   function getDraft(task: ReviewTask): ReviewDraft {
     return drafts[task.id] ?? {
       decision: task.decision === "unmatched" ? "manual_rate" : "confirm_match",
@@ -197,6 +204,7 @@ export default function ReviewTasksPage() {
   async function onSyncBridge() {
     setSyncingBridge(true);
     setBridgeError("");
+    setBulkActionMessage("");
     try {
       const token = await requireToken();
       const response = await syncReviewTaskBridge(token);
@@ -213,6 +221,7 @@ export default function ReviewTasksPage() {
   async function onClaim(taskId: number) {
     setSavingTaskId(taskId);
     setTasksError("");
+    setBulkActionMessage("");
     try {
       const token = await requireToken();
       await claimReviewTask(taskId, token);
@@ -228,6 +237,7 @@ export default function ReviewTasksPage() {
     const draft = getDraft(task);
     setSavingTaskId(task.id);
     setTasksError("");
+    setBulkActionMessage("");
     try {
       const token = await requireToken();
       await submitReviewTask(
@@ -253,6 +263,7 @@ export default function ReviewTasksPage() {
     const draft = getDraft(task);
     setSavingTaskId(task.id);
     setTasksError("");
+    setBulkActionMessage("");
     try {
       const token = await requireToken();
       await qaReviewTask(
@@ -266,6 +277,27 @@ export default function ReviewTasksPage() {
       await refreshTasks();
     } catch (error) {
       setTasksError(getErrorMessage(error, "The QA decision could not be saved."));
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
+  async function onBulkClaim() {
+    if (claimableTaskIds.length === 0) {
+      return;
+    }
+    setSavingTaskId(-1);
+    setTasksError("");
+    setBulkActionMessage("");
+    try {
+      const token = await requireToken();
+      const result = await bulkClaimReviewTasks(claimableTaskIds, token);
+      await refreshTasks();
+      setBulkActionMessage(
+        `Claimed ${result.claimed_count} tasks${result.skipped_count ? `, skipped ${result.skipped_count}` : ""}.`,
+      );
+    } catch (error) {
+      setTasksError(getErrorMessage(error, "The filtered review tasks could not be claimed in bulk."));
     } finally {
       setSavingTaskId(null);
     }
@@ -494,6 +526,12 @@ export default function ReviewTasksPage() {
             {specialistOnly ? " - specialist gaps only" : ""}
           </p>
         ) : null}
+        {bulkActionMessage ? <p className="helperText" style={{ color: "var(--accent)" }}>{bulkActionMessage}</p> : null}
+        <div className="inlineActions" style={{ marginTop: 12 }}>
+          <button type="button" onClick={() => void onBulkClaim()} disabled={savingTaskId === -1 || claimableTaskIds.length === 0}>
+            {savingTaskId === -1 ? "Claiming filtered tasks..." : `Claim filtered open tasks${claimableTaskIds.length ? ` (${claimableTaskIds.length})` : ""}`}
+          </button>
+        </div>
 
         {loadingTasks ? (
           <div className="emptyState">Loading review tasks...</div>

@@ -250,6 +250,55 @@ def test_review_task_cannot_be_claimed_or_submitted_twice() -> None:
     assert second_submit.status_code == 409
 
 
+def test_bulk_claim_review_tasks_claims_open_tasks_and_skips_submitted() -> None:
+    create_response = client.post("/jobs", json={"title": "Bulk Claim Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    client.post(
+        f"/jobs/{job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("survey.xlsx", _build_specialist_gap_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    client.post(f"/jobs/{job_id}/price-boq")
+    sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    task_id = sync_response.json()["tasks"][0]["id"]
+
+    submitted_job = client.post("/jobs", json={"title": "Submitted Bulk Claim Guardrail", "region": "Nairobi"})
+    submitted_job_id = submitted_job.json()["id"]
+    client.post(
+        f"/jobs/{submitted_job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("sample.xlsx", _build_unmatched_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    client.post(f"/jobs/{submitted_job_id}/price-boq")
+    submitted_sync = client.post(f"/jobs/{submitted_job_id}/review-tasks/sync")
+    submitted_task_id = submitted_sync.json()["tasks"][0]["id"]
+    client.post(f"/review-tasks/{submitted_task_id}/claim")
+    client.post(
+        f"/review-tasks/{submitted_task_id}/submit",
+        json={
+            "decision": "no_good_match",
+            "category_direction": "survey",
+            "matched_description": "",
+            "rate": None,
+            "reviewer_note": "Already submitted",
+        },
+    )
+
+    bulk_response = client.post(
+        "/review-tasks/bulk/claim",
+        json={"task_ids": [task_id, submitted_task_id, 999999]},
+    )
+    assert bulk_response.status_code == 200
+    body = bulk_response.json()
+    assert body["requested_count"] == 3
+    assert body["claimed_count"] == 1
+    assert body["skipped_count"] == 2
+    assert len(body["tasks"]) == 1
+    assert body["tasks"][0]["id"] == task_id
+    assert body["tasks"][0]["status"] == "claimed"
+
+
 def test_review_task_can_move_into_qa_states() -> None:
     create_response = client.post("/jobs", json={"title": "Reviewer QA Job", "region": "Nairobi"})
     job_id = create_response.json()["id"]
