@@ -102,6 +102,11 @@ class ReviewTaskSyncResponse(BaseModel):
     tasks: list[ReviewTaskResponse] = Field(default_factory=list)
 
 
+class ReviewTaskBacklogAreaResponse(BaseModel):
+    label: str
+    count: int = 0
+
+
 class ReviewTaskBridgeSummaryResponse(BaseModel):
     available: bool
     workbook_path: str = ""
@@ -111,6 +116,7 @@ class ReviewTaskBridgeSummaryResponse(BaseModel):
     candidate_review_records: int = 0
     synced_candidate_rows: int = 0
     pending_workbook_candidates: int = 0
+    taxonomy_backlog: list[ReviewTaskBacklogAreaResponse] = Field(default_factory=list)
 
 
 class ReviewTaskBridgeSyncResponse(BaseModel):

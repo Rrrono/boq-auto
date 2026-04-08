@@ -243,6 +243,10 @@ Recent uncommitted work in the current checkpoint:
   - that field should persist on the task itself
   - approved outcomes should carry that structured direction into normalized promotion metadata
   - the goal is to turn specialist review into reusable taxonomy guidance rather than losing it inside reviewer notes
+- the next slice after structured `category_direction` capture should make that guidance visible operationally:
+  - the hosted reviewer workflow should summarize the strongest taxonomy backlog areas
+  - this should group specialist reviewer work by submitted category direction or inferred focus area
+  - the point is to make category-direction capture actionable for planning, not just storable in metadata
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit

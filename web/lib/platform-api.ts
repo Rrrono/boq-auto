@@ -180,6 +180,7 @@ export type ReviewTaskBridgeSummary = {
   candidate_review_records: number;
   synced_candidate_rows: number;
   pending_workbook_candidates: number;
+  taxonomy_backlog: Array<{ label: string; count: number }>;
 };
 
 export type ReviewTaskBridgeSyncResponse = {

@@ -9,7 +9,14 @@ import os
 
 from sqlalchemy.orm import Session
 
-from app.models.job import ReviewTaskBridgeSummaryResponse, ReviewTaskBridgeSyncResponse, ReviewTaskResponse, ReviewTaskSyncResponse
+from app.db import SessionLocal
+from app.models.job import (
+    ReviewTaskBacklogAreaResponse,
+    ReviewTaskBridgeSummaryResponse,
+    ReviewTaskBridgeSyncResponse,
+    ReviewTaskResponse,
+    ReviewTaskSyncResponse,
+)
 from app.orm_models import Job, JobRun, ReviewTask
 from src.cost_schema import CostDatabase
 from src.ingestion import candidate_positions, generate_review_report, sync_review_artifacts_to_candidate_matches
@@ -338,6 +345,30 @@ def _count_synced_candidate_rows(workbook_path: Path) -> tuple[int, int]:
     return synced_count, pending_count
 
 
+def _taxonomy_backlog() -> list[ReviewTaskBacklogAreaResponse]:
+    counts: dict[str, int] = {}
+    with SessionLocal() as db:
+        tasks = list(db.query(ReviewTask).order_by(ReviewTask.updated_at.desc()).all())
+
+    for task in tasks:
+        inferred_focus_area, specialist_gap_flag = _focus_area(
+            {
+                "description": task.description,
+                "flag_reasons": json.loads(task.flag_reasons_json or "[]"),
+                "decision": task.decision,
+            }
+        )
+        label = (task.submitted_category_direction or inferred_focus_area).strip()
+        if not label or (not specialist_gap_flag and not task.submitted_category_direction):
+            continue
+        counts[label] = counts.get(label, 0) + 1
+
+    return [
+        ReviewTaskBacklogAreaResponse(label=label, count=count)
+        for label, count in sorted(counts.items(), key=lambda entry: (-entry[1], entry[0]))[:6]
+    ]
+
+
 def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
     workbook_path, schema_path = _resolve_workbook_and_schema_paths()
     if workbook_path is None or schema_path is None or not schema_path.exists():
@@ -354,6 +385,7 @@ def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
         candidate_review_records=len(repository.fetch_candidate_reviews()),
         synced_candidate_rows=synced_candidate_rows,
         pending_workbook_candidates=pending_workbook_candidates,
+        taxonomy_backlog=_taxonomy_backlog(),
     )
 
 

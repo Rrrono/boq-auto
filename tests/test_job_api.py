@@ -507,6 +507,12 @@ def test_category_direction_submission_is_persisted_and_promoted(tmp_path) -> No
     assert reviews
     assert reviews[0].reason == "survey"
 
+    summary_response = client.get("/review-tasks/bridge")
+    assert summary_response.status_code == 200
+    summary_body = summary_response.json()
+    labels = {entry["label"] for entry in summary_body["taxonomy_backlog"]}
+    assert "survey" in labels
+
 
 def test_review_task_bridge_summary_and_sync_endpoint(tmp_path) -> None:
     schema_source = tmp_path / "runtime_master.xlsx"
@@ -537,6 +543,7 @@ def test_review_task_bridge_summary_and_sync_endpoint(tmp_path) -> None:
     assert summary_body["available"] is True
     assert summary_body["rate_observations"] >= 1
     assert summary_body["alias_suggestions"] >= 1
+    assert "taxonomy_backlog" in summary_body
 
     sync_response = client.post("/review-tasks/bridge/sync")
     assert sync_response.status_code == 200

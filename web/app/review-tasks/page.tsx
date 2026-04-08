@@ -300,6 +300,22 @@ export default function ReviewTasksPage() {
                 <span>{bridge.pending_workbook_candidates}</span>
               </div>
             </div>
+            <div className="card" style={{ marginTop: 14 }}>
+              <span className="pill">Taxonomy Backlog</span>
+              <h3>Where structured reviewer guidance is accumulating</h3>
+              {bridge.taxonomy_backlog.length === 0 ? (
+                <div className="emptyState">No specialist category-direction backlog is visible yet.</div>
+              ) : (
+                <div className="metaGrid">
+                  {bridge.taxonomy_backlog.map((area) => (
+                    <div key={area.label} className="metaRow">
+                      <strong>{area.label.replaceAll("_", " ")}</strong>
+                      <span>{area.count} reviewer tasks</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <p className="helperText">
               Workbook: <span className="monoText">{bridge.workbook_path}</span>
             </p>
