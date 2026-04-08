@@ -347,6 +347,8 @@ def test_bulk_qa_review_tasks_updates_submitted_tasks() -> None:
     reviewers = {entry["reviewer_email"]: entry for entry in summary_body["reviewer_workload"]}
     assert "local-dev" in reviewers
     assert reviewers["local-dev"]["approved_count"] >= 1
+    promotion_entries = {entry["label"]: entry["count"] for entry in summary_body["promotion_pipeline"]}
+    assert promotion_entries["logged"] >= 1
 
 
 def test_review_task_can_move_into_qa_states() -> None:

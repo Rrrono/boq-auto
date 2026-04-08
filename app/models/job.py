@@ -115,6 +115,11 @@ class ReviewTaskReviewerSummaryResponse(BaseModel):
     promotion_logged_count: int = 0
 
 
+class ReviewTaskPromotionSummaryResponse(BaseModel):
+    label: str
+    count: int = 0
+
+
 class ReviewTaskBridgeSummaryResponse(BaseModel):
     available: bool
     workbook_path: str = ""
@@ -126,6 +131,7 @@ class ReviewTaskBridgeSummaryResponse(BaseModel):
     pending_workbook_candidates: int = 0
     taxonomy_backlog: list[ReviewTaskBacklogAreaResponse] = Field(default_factory=list)
     reviewer_workload: list[ReviewTaskReviewerSummaryResponse] = Field(default_factory=list)
+    promotion_pipeline: list[ReviewTaskPromotionSummaryResponse] = Field(default_factory=list)
 
 
 class ReviewTaskBridgeSyncResponse(BaseModel):

@@ -352,7 +352,7 @@ export default function ReviewTasksPage() {
         <span className="pill">Operations Board</span>
         <h3>Phase 3 reviewer operations are now measurable.</h3>
         <p className="helperText" style={{ marginTop: 8 }}>
-          After redeploy, look for this board plus a reviewer workload table under the Learning Bridge. That is the clearest signal that the operations-phase UI is live.
+          After redeploy, look for this board plus both the reviewer workload table and a promotion pipeline panel under the Learning Bridge. That is the clearest signal that the operations-phase UI is live.
         </p>
       </section>
 
@@ -516,6 +516,28 @@ export default function ReviewTasksPage() {
                         Claimed {reviewer.claimed_count} | Submitted {reviewer.submitted_count} | Approved {reviewer.approved_count} | Logged {reviewer.promotion_logged_count}
                       </span>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="card" style={{ marginTop: 14 }}>
+              <span className="pill">Promotion Pipeline</span>
+              <h3>What is ready to move into the knowledge loop</h3>
+              {bridge.promotion_pipeline.length === 0 ? (
+                <div className="emptyState">No promotion pipeline activity is visible yet.</div>
+              ) : (
+                <div className="metaGrid">
+                  {bridge.promotion_pipeline.map((entry) => (
+                    <button
+                      key={entry.label}
+                      type="button"
+                      className="metaRow"
+                      style={{ textAlign: "left", background: "transparent" }}
+                      onClick={() => setPromotionFilter(entry.label)}
+                    >
+                      <strong>{entry.label.replaceAll("_", " ")}</strong>
+                      <span>{entry.count} tasks</span>
+                    </button>
                   ))}
                 </div>
               )}

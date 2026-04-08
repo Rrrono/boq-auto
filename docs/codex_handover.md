@@ -276,6 +276,11 @@ Recent uncommitted work in the current checkpoint:
   - the Learning Bridge now includes a `Reviewer Workload` summary
   - reviewer workload remains visible even if the workbook/schema bridge itself is unavailable
   - this makes the reviewer page look and behave more like a managed operations surface than a raw queue
+- the next reviewer-operations slice now adds a promotion board:
+  - the Learning Bridge now includes a `Promotion Pipeline` panel
+  - promotion pipeline entries are clickable and drive the queue `promotion_status` filter directly
+  - this makes it much easier to jump straight to `ready`, `logged`, or `needs_attention` work
+  - combined with the existing `Phase 3 Milestone` and `Operations Board` cards, this is now a very obvious live-site signal after redeploy
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
@@ -430,6 +435,10 @@ The current reviewer queue is intentionally MVP-level. The next best extensions 
 - the next natural step after the current milestone is bulk promotion-readiness or bulk bridge-sync actions so QA-approved clusters move forward just as easily as they can now be claimed and QA’d
 - the next natural step after the current milestone is bulk promotion-readiness or bulk bridge-sync actions so QA-approved clusters move forward just as easily as they can now be claimed and QA’d
 - after that, reviewer performance summaries, payout-readiness, and managed assignment rules become the clearest path toward a fuller reviewer marketplace phase
+- the next immediate hosted milestone should make promotion flow visible and clickable:
+  - show a promotion pipeline summary on the reviewer page
+  - let operators jump straight to `ready`, `logged`, or `needs_attention` clusters
+  - make the reviewer page feel like a true operations board for the knowledge loop, not only for review handling
 
 ### Current in-flight direction
 

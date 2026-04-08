@@ -188,6 +188,10 @@ export type ReviewTaskBridgeSummary = {
     approved_count: number;
     promotion_logged_count: number;
   }>;
+  promotion_pipeline: Array<{
+    label: string;
+    count: number;
+  }>;
 };
 
 export type ReviewTaskBridgeSyncResponse = {

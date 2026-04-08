@@ -14,6 +14,7 @@ from app.models.job import (
     ReviewTaskBacklogAreaResponse,
     ReviewTaskBridgeSummaryResponse,
     ReviewTaskBridgeSyncResponse,
+    ReviewTaskPromotionSummaryResponse,
     ReviewTaskReviewerSummaryResponse,
     ReviewTaskResponse,
     ReviewTaskSyncResponse,
@@ -462,6 +463,26 @@ def _reviewer_workload() -> list[ReviewTaskReviewerSummaryResponse]:
     ]
 
 
+def _promotion_pipeline() -> list[ReviewTaskPromotionSummaryResponse]:
+    counts: dict[str, int] = {}
+    with SessionLocal() as db:
+        tasks = list(db.query(ReviewTask).order_by(ReviewTask.updated_at.desc()).all())
+
+    for task in tasks:
+        label = (task.promotion_status or "pending").strip().lower() or "pending"
+        counts[label] = counts.get(label, 0) + 1
+
+    preferred_order = ["ready", "logged", "needs_attention", "pending", "closed"]
+    ranked_labels = sorted(
+        counts,
+        key=lambda label: (
+            preferred_order.index(label) if label in preferred_order else len(preferred_order),
+            label,
+        ),
+    )
+    return [ReviewTaskPromotionSummaryResponse(label=label, count=counts[label]) for label in ranked_labels]
+
+
 def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
     workbook_path, schema_path = _resolve_workbook_and_schema_paths()
     if workbook_path is None or schema_path is None or not schema_path.exists():
@@ -469,6 +490,7 @@ def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
             available=False,
             taxonomy_backlog=_taxonomy_backlog(),
             reviewer_workload=_reviewer_workload(),
+            promotion_pipeline=_promotion_pipeline(),
         )
 
     repository = CostDatabase(schema_path)
@@ -484,6 +506,7 @@ def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
         pending_workbook_candidates=pending_workbook_candidates,
         taxonomy_backlog=_taxonomy_backlog(),
         reviewer_workload=_reviewer_workload(),
+        promotion_pipeline=_promotion_pipeline(),
     )
 
 
