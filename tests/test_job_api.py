@@ -299,6 +299,49 @@ def test_bulk_claim_review_tasks_claims_open_tasks_and_skips_submitted() -> None
     assert body["tasks"][0]["status"] == "claimed"
 
 
+def test_bulk_qa_review_tasks_updates_submitted_tasks() -> None:
+    create_response = client.post("/jobs", json={"title": "Bulk QA Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    client.post(
+        f"/jobs/{job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("sample.xlsx", _build_unmatched_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    client.post(f"/jobs/{job_id}/price-boq")
+    sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    task_id = sync_response.json()["tasks"][0]["id"]
+
+    client.post(f"/review-tasks/{task_id}/claim")
+    client.post(
+        f"/review-tasks/{task_id}/submit",
+        json={
+            "decision": "manual_rate",
+            "category_direction": "survey",
+            "matched_description": "Bulk QA manual rate",
+            "rate": 4100.0,
+            "reviewer_note": "Ready for bulk QA",
+        },
+    )
+
+    bulk_response = client.post(
+        "/review-tasks/bulk/qa",
+        json={
+            "task_ids": [task_id, 999999],
+            "qa_status": "approved",
+            "qa_note": "Batch approved for reviewer milestone.",
+        },
+    )
+    assert bulk_response.status_code == 200
+    body = bulk_response.json()
+    assert body["requested_count"] == 2
+    assert body["updated_count"] == 1
+    assert body["skipped_count"] == 1
+    assert len(body["tasks"]) == 1
+    assert body["tasks"][0]["id"] == task_id
+    assert body["tasks"][0]["qa_status"] == "approved"
+
+
 def test_review_task_can_move_into_qa_states() -> None:
     create_response = client.post("/jobs", json={"title": "Reviewer QA Job", "region": "Nairobi"})
     job_id = create_response.json()["id"]

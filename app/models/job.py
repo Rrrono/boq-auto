@@ -151,3 +151,16 @@ class ReviewTaskBulkClaimResponse(BaseModel):
     claimed_count: int
     skipped_count: int
     tasks: list[ReviewTaskResponse] = Field(default_factory=list)
+
+
+class ReviewTaskBulkQaRequest(BaseModel):
+    task_ids: list[int] = Field(default_factory=list, max_length=100)
+    qa_status: str = Field(min_length=1, max_length=32)
+    qa_note: str = Field(default="", max_length=4000)
+
+
+class ReviewTaskBulkQaResponse(BaseModel):
+    requested_count: int
+    updated_count: int
+    skipped_count: int
+    tasks: list[ReviewTaskResponse] = Field(default_factory=list)

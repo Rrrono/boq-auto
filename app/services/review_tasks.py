@@ -577,3 +577,52 @@ def qa_review_task(
     db.commit()
     db.refresh(task)
     return task
+
+
+def bulk_qa_review_tasks(
+    db: Session,
+    task_ids: list[int],
+    *,
+    reviewer_uid: str,
+    reviewer_email: str | None,
+    qa_status: str,
+    qa_note: str,
+) -> tuple[list[ReviewTask], int]:
+    if not task_ids:
+        return [], 0
+
+    normalized_status = qa_status.strip().lower()
+    tasks = list(
+        db.query(ReviewTask)
+        .filter(ReviewTask.id.in_(task_ids))
+        .order_by(ReviewTask.updated_at.desc(), ReviewTask.created_at.desc())
+        .all()
+    )
+    updated: list[ReviewTask] = []
+    skipped_count = 0
+    now = datetime.now(timezone.utc)
+
+    for task in tasks:
+        if task.status != "submitted":
+            skipped_count += 1
+            continue
+        task.qa_status = normalized_status
+        task.qa_reviewer_uid = reviewer_uid
+        task.qa_reviewer_email = reviewer_email or ""
+        task.qa_note = qa_note.strip()
+        promotion_target, promotion_status, feedback_action = _promotion_plan(task, normalized_status)
+        task.promotion_target = promotion_target
+        task.promotion_status = promotion_status
+        task.feedback_action = feedback_action
+        task.qa_updated_at = now
+        task.feedback_logged_at = _log_feedback_if_possible(task, feedback_action)
+        task.promotion_status = _persist_promotion_artifact(task, reviewer_email or task.qa_reviewer_email)
+        task.updated_at = now
+        updated.append(task)
+
+    db.commit()
+    for task in updated:
+        db.refresh(task)
+    requested_count = len(task_ids)
+    skipped_count += max(0, requested_count - len(tasks))
+    return updated, skipped_count

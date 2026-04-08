@@ -10,6 +10,8 @@ from app.db import get_db
 from app.models.job import (
     ReviewTaskBulkClaimRequest,
     ReviewTaskBulkClaimResponse,
+    ReviewTaskBulkQaRequest,
+    ReviewTaskBulkQaResponse,
     ReviewTaskBridgeSummaryResponse,
     ReviewTaskBridgeSyncResponse,
     ReviewTaskQaRequest,
@@ -21,6 +23,7 @@ from app.services.jobs import get_job
 from app.services.review_tasks import (
     claim_review_task,
     bulk_claim_review_tasks,
+    bulk_qa_review_tasks,
     get_review_task_bridge_summary,
     get_review_task,
     list_review_tasks,
@@ -78,6 +81,31 @@ def bulk_claim_review_tasks_endpoint(
         claimed_count=len(claimed),
         skipped_count=skipped_count,
         tasks=[serialize_review_task(task) for task in claimed],
+    )
+
+
+@router.post("/review-tasks/bulk/qa", response_model=ReviewTaskBulkQaResponse)
+def bulk_qa_review_tasks_endpoint(
+    payload: ReviewTaskBulkQaRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> ReviewTaskBulkQaResponse:
+    normalized_status = payload.qa_status.strip().lower()
+    if normalized_status not in {"approved", "rejected", "escalated"}:
+        raise HTTPException(status_code=400, detail="QA status must be approved, rejected, or escalated.")
+    updated, skipped_count = bulk_qa_review_tasks(
+        db,
+        payload.task_ids,
+        reviewer_uid=user.uid,
+        reviewer_email=user.email,
+        qa_status=payload.qa_status,
+        qa_note=payload.qa_note,
+    )
+    return ReviewTaskBulkQaResponse(
+        requested_count=len(payload.task_ids),
+        updated_count=len(updated),
+        skipped_count=skipped_count,
+        tasks=[serialize_review_task(task) for task in updated],
     )
 
 

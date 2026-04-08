@@ -200,6 +200,13 @@ export type ReviewTaskBulkClaimResponse = {
   tasks: ReviewTask[];
 };
 
+export type ReviewTaskBulkQaResponse = {
+  requested_count: number;
+  updated_count: number;
+  skipped_count: number;
+  tasks: ReviewTask[];
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -355,6 +362,19 @@ export async function bulkClaimReviewTasks(taskIds: number[], token?: string | n
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ task_ids: taskIds }),
+  });
+}
+
+export async function bulkQaReviewTasks(
+  taskIds: number[],
+  payload: { qa_status: string; qa_note: string },
+  token?: string | null,
+): Promise<ReviewTaskBulkQaResponse> {
+  return apiFetch<ReviewTaskBulkQaResponse>("/review-tasks/bulk/qa", {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ task_ids: taskIds, ...payload }),
   });
 }
 

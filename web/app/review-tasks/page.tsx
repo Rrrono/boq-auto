@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../components/auth-provider";
 import {
   bulkClaimReviewTasks,
+  bulkQaReviewTasks,
   type ReviewTaskBridgeSummary,
   type ReviewTask,
   claimReviewTask,
@@ -48,6 +49,8 @@ export default function ReviewTasksPage() {
   const [syncingBridge, setSyncingBridge] = useState(false);
   const [drafts, setDrafts] = useState<Record<number, ReviewDraft>>({});
   const [bulkActionMessage, setBulkActionMessage] = useState("");
+  const [bulkQaStatus, setBulkQaStatus] = useState("approved");
+  const [bulkQaNote, setBulkQaNote] = useState("");
 
   async function loadQueue(
     token: string,
@@ -167,6 +170,10 @@ export default function ReviewTasksPage() {
 
   const claimableTaskIds = useMemo(
     () => tasks.filter((task) => task.status === "open").map((task) => task.id),
+    [tasks],
+  );
+  const qaReadyTaskIds = useMemo(
+    () => tasks.filter((task) => task.status === "submitted").map((task) => task.id),
     [tasks],
   );
 
@@ -303,8 +310,44 @@ export default function ReviewTasksPage() {
     }
   }
 
+  async function onBulkQa() {
+    if (qaReadyTaskIds.length === 0) {
+      return;
+    }
+    setSavingTaskId(-2);
+    setTasksError("");
+    setBulkActionMessage("");
+    try {
+      const token = await requireToken();
+      const result = await bulkQaReviewTasks(
+        qaReadyTaskIds,
+        {
+          qa_status: bulkQaStatus,
+          qa_note: bulkQaNote,
+        },
+        token,
+      );
+      await refreshTasks();
+      setBulkActionMessage(
+        `Applied bulk QA to ${result.updated_count} tasks${result.skipped_count ? `, skipped ${result.skipped_count}` : ""}.`,
+      );
+    } catch (error) {
+      setTasksError(getErrorMessage(error, "The filtered submitted tasks could not be moved through QA in bulk."));
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
   return (
     <div className="stack">
+      <section className="card" style={{ borderColor: "var(--accent)", boxShadow: "0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)" }}>
+        <span className="pill">Phase 3 Milestone</span>
+        <h3>Reviewer operations are now batch-capable.</h3>
+        <p className="helperText" style={{ marginTop: 8 }}>
+          After redeploy, you should immediately see this milestone card on the reviewer page, plus bulk claim and bulk QA controls in the queue area.
+        </p>
+      </section>
+
       <section className="hero">
         <span className="eyebrow">Reviewer Workflow</span>
         <h2 className="headline">Review tasks turn weak BOQ rows into claimable work.</h2>
@@ -531,6 +574,27 @@ export default function ReviewTasksPage() {
           <button type="button" onClick={() => void onBulkClaim()} disabled={savingTaskId === -1 || claimableTaskIds.length === 0}>
             {savingTaskId === -1 ? "Claiming filtered tasks..." : `Claim filtered open tasks${claimableTaskIds.length ? ` (${claimableTaskIds.length})` : ""}`}
           </button>
+        </div>
+        <div className="card" style={{ marginTop: 12 }}>
+          <span className="pill">Bulk QA</span>
+          <h3>Move the current submitted queue forward together</h3>
+          <div className="form">
+            <label>
+              QA outcome
+              <select value={bulkQaStatus} onChange={(event) => setBulkQaStatus(event.target.value)}>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="escalated">Escalated</option>
+              </select>
+            </label>
+            <label>
+              QA note
+              <textarea rows={2} value={bulkQaNote} onChange={(event) => setBulkQaNote(event.target.value)} />
+            </label>
+            <button type="button" onClick={() => void onBulkQa()} disabled={savingTaskId === -2 || qaReadyTaskIds.length === 0}>
+              {savingTaskId === -2 ? "Applying bulk QA..." : `Apply QA to filtered submitted tasks${qaReadyTaskIds.length ? ` (${qaReadyTaskIds.length})` : ""}`}
+            </button>
+          </div>
         </div>
 
         {loadingTasks ? (
