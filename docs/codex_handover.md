@@ -218,6 +218,10 @@ Recent uncommitted work in the current checkpoint:
   - `POST /review-tasks/bridge/sync` runs the sync into `CandidateMatches` and refreshes `Candidate Review`
   - the hosted reviewer page now shows the bridge summary and a sync action
   - this makes the reviewer-learning bridge visible in the web workflow instead of CLI-only
+- the next runtime alignment fix is to make that hosted bridge reuse the same cloud database resolution as pricing:
+  - pricing already supports `BOQ_AUTO_API_DB_GCS_URI`
+  - the bridge must follow that same runtime workbook path instead of only local release paths
+  - `scripts/deploy_all_cloudshell.sh` should also set `BOQ_AUTO_API_DB_SIDECAR_GCS_URI` by default so Cloud Run has the normalized schema alongside the workbook
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
@@ -291,6 +295,14 @@ Cloud SQL-backed web platform/API deployment depends on:
 - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
 - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
+
+### Runtime database note
+
+- pricing and the hosted reviewer bridge should resolve the same runtime workbook/schema pair
+- in Cloud Run, that usually means setting both:
+  - `BOQ_AUTO_API_DB_GCS_URI`
+  - `BOQ_AUTO_API_DB_SIDECAR_GCS_URI`
+- if the workbook URI is set but the sidecar URI is missing, pricing can still work while the hosted learning bridge reports unavailable
 
 ## Current Priorities
 

@@ -82,17 +82,26 @@ def process_boq_upload(file_bytes: bytes, filename: str, region: str) -> BoqProc
 
 
 def _resolve_database_path(config) -> Path:
+    db_path, _ = resolve_runtime_database_paths(config)
+    if db_path is None or not db_path.exists():
+        raise FileNotFoundError(f"Pricing database not found: {db_path}")
+    return db_path
+
+
+def resolve_runtime_database_paths(config=None) -> tuple[Path | None, Path | None]:
+    config = config or load_config()
     override = os.getenv("BOQ_AUTO_API_DB_PATH", "").strip()
     gcs_override = os.getenv("BOQ_AUTO_API_DB_GCS_URI", "").strip()
     if gcs_override:
-        return _resolve_gcs_database(gcs_override)
+        db_path = _resolve_gcs_database(gcs_override)
+        sidecar_path = schema_database_path(db_path)
+        return db_path, sidecar_path if sidecar_path.exists() else None
     if override:
         db_path = Path(override)
     else:
         db_path = current_production_database_path(config)
-    if not db_path.exists():
-        raise FileNotFoundError(f"Pricing database not found: {db_path}")
-    return db_path
+    sidecar_path = schema_database_path(db_path)
+    return db_path if db_path.exists() else None, sidecar_path if sidecar_path.exists() else None
 
 
 def _resolve_gcs_database(gcs_uri: str) -> Path:

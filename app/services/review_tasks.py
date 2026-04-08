@@ -11,10 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.models.job import ReviewTaskBridgeSummaryResponse, ReviewTaskBridgeSyncResponse, ReviewTaskResponse, ReviewTaskSyncResponse
 from app.orm_models import Job, JobRun, ReviewTask
-from src.config_loader import load_config
-from src.cost_schema import CostDatabase, schema_database_path
+from src.cost_schema import CostDatabase
 from src.ingestion import candidate_positions, generate_review_report, sync_review_artifacts_to_candidate_matches
-from src.release_manager import current_production_database_path
+from app.services.cost_engine import resolve_runtime_database_paths
 from openpyxl import load_workbook
 
 
@@ -247,26 +246,9 @@ def submit_review_task(
     return task
 
 
-def _resolve_schema_database_path() -> Path | None:
-    override = os.getenv("BOQ_AUTO_API_DB_PATH", "").strip()
-    if override:
-        return schema_database_path(override)
-    config = load_config()
-    db_path = current_production_database_path(config)
-    if not db_path.exists():
-        return None
-    return schema_database_path(db_path)
-
-
-def _resolve_workbook_database_path() -> Path | None:
-    override = os.getenv("BOQ_AUTO_API_DB_PATH", "").strip()
-    if override:
-        return Path(override)
-    config = load_config()
-    db_path = current_production_database_path(config)
-    if not db_path.exists():
-        return None
-    return db_path
+def _resolve_workbook_and_schema_paths() -> tuple[Path | None, Path | None]:
+    workbook_path, schema_path = resolve_runtime_database_paths()
+    return workbook_path, schema_path
 
 
 def _count_synced_candidate_rows(workbook_path: Path) -> tuple[int, int]:
@@ -291,8 +273,7 @@ def _count_synced_candidate_rows(workbook_path: Path) -> tuple[int, int]:
 
 
 def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
-    workbook_path = _resolve_workbook_database_path()
-    schema_path = _resolve_schema_database_path()
+    workbook_path, schema_path = _resolve_workbook_and_schema_paths()
     if workbook_path is None or schema_path is None or not schema_path.exists():
         return ReviewTaskBridgeSummaryResponse(available=False)
 
@@ -311,8 +292,7 @@ def get_review_task_bridge_summary() -> ReviewTaskBridgeSummaryResponse:
 
 
 def sync_review_task_bridge(*, refresh_review_report: bool = True) -> ReviewTaskBridgeSyncResponse:
-    workbook_path = _resolve_workbook_database_path()
-    schema_path = _resolve_schema_database_path()
+    workbook_path, schema_path = _resolve_workbook_and_schema_paths()
     if workbook_path is None or schema_path is None or not schema_path.exists():
         summary = get_review_task_bridge_summary()
         return ReviewTaskBridgeSyncResponse(available=False, bridge=summary)
@@ -355,7 +335,7 @@ def _promotion_plan(task: ReviewTask, qa_status: str) -> tuple[str, str, str]:
 def _log_feedback_if_possible(task: ReviewTask, feedback_action: str) -> datetime | None:
     if not feedback_action or not task.matched_item_code:
         return None
-    schema_path = _resolve_schema_database_path()
+    _, schema_path = _resolve_workbook_and_schema_paths()
     if schema_path is None or not Path(schema_path).exists():
         return None
     repository = CostDatabase(schema_path)
@@ -374,7 +354,7 @@ def _log_feedback_if_possible(task: ReviewTask, feedback_action: str) -> datetim
 def _persist_promotion_artifact(task: ReviewTask, reviewer_email: str | None) -> str:
     if task.promotion_status not in {"ready", "needs_attention"} or not task.promotion_target:
         return task.promotion_status
-    schema_path = _resolve_schema_database_path()
+    _, schema_path = _resolve_workbook_and_schema_paths()
     if schema_path is None:
         return task.promotion_status
 
