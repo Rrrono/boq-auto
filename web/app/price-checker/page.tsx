@@ -181,7 +181,7 @@ export default function PriceCheckerPage() {
                     <td>{item.job_title}</td>
                     <td>{item.region}</td>
                     <td>{item.description}</td>
-                    <td>{item.matched_description || "-"}</td>
+                    <td>{item.display_matched_description || "-"}</td>
                     <td>
                       <span className={decisionClass(item.decision)}>{item.decision}</span>
                     </td>

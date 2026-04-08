@@ -11,6 +11,7 @@ class PriceObservationResponse(BaseModel):
     region: str
     description: str
     matched_description: str = ""
+    display_matched_description: str = ""
     unit: str = ""
     rate: float
     amount: float | None = None
@@ -38,6 +39,7 @@ class KnowledgeCandidateResponse(BaseModel):
     region: str
     description: str
     matched_description: str = ""
+    display_matched_description: str = ""
     decision: str = ""
     confidence_score: float = 0.0
     confidence_band: str = "very_low"

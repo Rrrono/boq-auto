@@ -32,6 +32,33 @@ def _item_flag_reasons(item: dict) -> list[str]:
     return [str(value) for value in item.get("flag_reasons", []) if str(value).strip()]
 
 
+def _display_matched_description(item: dict) -> str:
+    matched_description = str(item.get("matched_description", "")).strip()
+    if not matched_description:
+        return ""
+
+    decision = str(item.get("decision", "")).strip().lower()
+    confidence_band = str(item.get("confidence_band", "very_low") or "very_low").strip().lower()
+    flag_reasons = set(_item_flag_reasons(item))
+    generic_match_flag = bool(item.get("generic_match_flag", False))
+    category_mismatch_flag = bool(item.get("category_mismatch_flag", False))
+    section_mismatch_flag = bool(item.get("section_mismatch_flag", False))
+
+    suspicious_fallback = (
+        decision in {"review", "unmatched"}
+        and confidence_band in {"low", "very_low"}
+        and (
+            generic_match_flag
+            or category_mismatch_flag
+            or section_mismatch_flag
+            or "generic_match" in flag_reasons
+            or "category_mismatch" in flag_reasons
+            or "section_mismatch" in flag_reasons
+        )
+    )
+    return "" if suspicious_fallback else matched_description
+
+
 def _focus_area_label(item: KnowledgeCandidateResponse) -> str:
     description = item.description.lower()
     reasons = set(item.flag_reasons)
@@ -92,6 +119,7 @@ def search_price_observations(db: Session, query: str = "", *, limit: int = 50) 
                     region=job.region,
                     description=description,
                     matched_description=matched_description,
+                    display_matched_description=_display_matched_description(item),
                     unit=str(item.get("unit", "")),
                     rate=float(rate),
                     amount=item.get("amount"),
@@ -146,6 +174,7 @@ def build_knowledge_queue(db: Session, *, limit: int = 50) -> KnowledgeQueueResp
                     region=job.region,
                     description=str(item.get("description", "")),
                     matched_description=str(item.get("matched_description", "")),
+                    display_matched_description=_display_matched_description(item),
                     decision=decision,
                     confidence_score=float(item.get("confidence_score", 0.0) or 0.0),
                     confidence_band=str(item.get("confidence_band", "very_low") or "very_low"),

@@ -69,6 +69,7 @@ export type PriceObservation = {
   region: string;
   description: string;
   matched_description: string;
+  display_matched_description: string;
   unit: string;
   rate: number;
   amount: number | null;
@@ -96,6 +97,7 @@ export type KnowledgeCandidate = {
   region: string;
   description: string;
   matched_description: string;
+  display_matched_description: string;
   decision: string;
   confidence_score: number;
   confidence_band: string;

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from app.db import Base, engine, init_db
 from app.db import SessionLocal
@@ -123,6 +123,7 @@ def test_price_check_and_knowledge_queue() -> None:
     assert "generic_match_flag" in first_observation
     assert "category_mismatch_flag" in first_observation
     assert "section_mismatch_flag" in first_observation
+    assert "display_matched_description" in first_observation
 
     knowledge_response = client.get("/knowledge/candidates")
     assert knowledge_response.status_code == 200
@@ -138,6 +139,7 @@ def test_price_check_and_knowledge_queue() -> None:
         assert "generic_match_flag" in first_candidate
         assert "category_mismatch_flag" in first_candidate
         assert "section_mismatch_flag" in first_candidate
+        assert "display_matched_description" in first_candidate
 
 
 def test_sync_claim_and_submit_review_tasks() -> None:

@@ -222,6 +222,15 @@ Recent uncommitted work in the current checkpoint:
   - pricing already supports `BOQ_AUTO_API_DB_GCS_URI`
   - the bridge must follow that same runtime workbook path instead of only local release paths
   - `scripts/deploy_all_cloudshell.sh` should also set `BOQ_AUTO_API_DB_SIDECAR_GCS_URI` by default so Cloud Run has the normalized schema alongside the workbook
+- the latest product diagnosis from live price-check evidence is broader than any one keyword like `survey`:
+  - review-first guardrails are doing their job and downgrading absurd specialist rows to `review` / `unmatched`
+  - however, the insights UI still exposes the raw fallback candidate text even when that candidate is obviously nonsense
+  - the core gap is therefore:
+    1. under-modeled specialist domains and work families
+    2. thin specialist candidate coverage
+    3. bad fallback display in review-facing UI even when the engine is correctly uncertain
+  - the immediate next slice should suppress obviously absurd fallback matches from the hosted insights views while preserving the raw `matched_description` for audit/debug paths
+  - after that, the stronger long-term fix remains taxonomy-first knowledge growth for specialist domains rather than matcher-only tuning
 - focused verification status for this checkpoint:
   - direct runtime smoke check passed for sync, dedupe, and promotion behavior
   - local pytest remains partially blocked in this environment by Windows temp-directory permissions, so the smoke check was used to verify bridge behavior before commit
