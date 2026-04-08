@@ -10,6 +10,8 @@ from app.db import get_db
 from app.models.job import (
     ReviewTaskBulkClaimRequest,
     ReviewTaskBulkClaimResponse,
+    ReviewTaskBulkPromotionRequest,
+    ReviewTaskBulkPromotionResponse,
     ReviewTaskBulkQaRequest,
     ReviewTaskBulkQaResponse,
     ReviewTaskBridgeSummaryResponse,
@@ -23,6 +25,7 @@ from app.services.jobs import get_job
 from app.services.review_tasks import (
     claim_review_task,
     bulk_claim_review_tasks,
+    bulk_close_logged_review_tasks,
     bulk_qa_review_tasks,
     get_review_task_bridge_summary,
     get_review_task,
@@ -106,6 +109,20 @@ def bulk_qa_review_tasks_endpoint(
         updated_count=len(updated),
         skipped_count=skipped_count,
         tasks=[serialize_review_task(task) for task in updated],
+    )
+
+
+@router.post("/review-tasks/bulk/promotion/close", response_model=ReviewTaskBulkPromotionResponse)
+def bulk_close_logged_review_tasks_endpoint(
+    payload: ReviewTaskBulkPromotionRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> ReviewTaskBulkPromotionResponse:
+    return bulk_close_logged_review_tasks(
+        db,
+        payload.task_ids,
+        reviewer_uid=user.uid,
+        reviewer_email=user.email,
     )
 
 

@@ -218,6 +218,15 @@ export type ReviewTaskBulkQaResponse = {
   tasks: ReviewTask[];
 };
 
+export type ReviewTaskBulkPromotionResponse = {
+  requested_count: number;
+  updated_count: number;
+  skipped_count: number;
+  review_report_rows: number;
+  bridge: ReviewTaskBridgeSummary;
+  tasks: ReviewTask[];
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -386,6 +395,18 @@ export async function bulkQaReviewTasks(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ task_ids: taskIds, ...payload }),
+  });
+}
+
+export async function bulkCloseLoggedReviewTasks(
+  taskIds: number[],
+  token?: string | null,
+): Promise<ReviewTaskBulkPromotionResponse> {
+  return apiFetch<ReviewTaskBulkPromotionResponse>("/review-tasks/bulk/promotion/close", {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ task_ids: taskIds }),
   });
 }
 

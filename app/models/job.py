@@ -179,3 +179,16 @@ class ReviewTaskBulkQaResponse(BaseModel):
     updated_count: int
     skipped_count: int
     tasks: list[ReviewTaskResponse] = Field(default_factory=list)
+
+
+class ReviewTaskBulkPromotionRequest(BaseModel):
+    task_ids: list[int] = Field(default_factory=list, max_length=100)
+
+
+class ReviewTaskBulkPromotionResponse(BaseModel):
+    requested_count: int
+    updated_count: int
+    skipped_count: int
+    review_report_rows: int = 0
+    bridge: ReviewTaskBridgeSummaryResponse
+    tasks: list[ReviewTaskResponse] = Field(default_factory=list)

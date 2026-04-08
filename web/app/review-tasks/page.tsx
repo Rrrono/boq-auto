@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "../../components/auth-provider";
 import {
+  bulkCloseLoggedReviewTasks,
   bulkClaimReviewTasks,
   bulkQaReviewTasks,
   type ReviewTaskBridgeSummary,
@@ -176,6 +177,10 @@ export default function ReviewTasksPage() {
     () => tasks.filter((task) => task.status === "submitted").map((task) => task.id),
     [tasks],
   );
+  const closablePromotionTaskIds = useMemo(
+    () => tasks.filter((task) => task.promotion_status === "logged" && task.qa_status === "approved").map((task) => task.id),
+    [tasks],
+  );
 
   function getDraft(task: ReviewTask): ReviewDraft {
     return drafts[task.id] ?? {
@@ -338,6 +343,28 @@ export default function ReviewTasksPage() {
     }
   }
 
+  async function onBulkPromotionClose() {
+    if (closablePromotionTaskIds.length === 0) {
+      return;
+    }
+    setSavingTaskId(-3);
+    setTasksError("");
+    setBulkActionMessage("");
+    try {
+      const token = await requireToken();
+      const result = await bulkCloseLoggedReviewTasks(closablePromotionTaskIds, token);
+      setBridge(result.bridge);
+      await refreshTasks();
+      setBulkActionMessage(
+        `Synced and closed ${result.updated_count} logged promotion tasks${result.skipped_count ? `, skipped ${result.skipped_count}` : ""}.`,
+      );
+    } catch (error) {
+      setTasksError(getErrorMessage(error, "The filtered logged promotion tasks could not be closed after bridge sync."));
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
   return (
     <div className="stack">
       <section className="card" style={{ borderColor: "var(--accent)", boxShadow: "0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)" }}>
@@ -353,6 +380,14 @@ export default function ReviewTasksPage() {
         <h3>Phase 3 reviewer operations are now measurable.</h3>
         <p className="helperText" style={{ marginTop: 8 }}>
           After redeploy, look for this board plus both the reviewer workload table and a promotion pipeline panel under the Learning Bridge. That is the clearest signal that the operations-phase UI is live.
+        </p>
+      </section>
+
+      <section className="card" style={{ borderColor: "color-mix(in srgb, var(--accent) 34%, transparent)", boxShadow: "0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent)" }}>
+        <span className="pill">Phase 3.5 Milestone</span>
+        <h3>Promotion clusters can now be advanced and closed in bulk.</h3>
+        <p className="helperText" style={{ marginTop: 8 }}>
+          After redeploy, look for the new Promotion Actions card under the Learning Bridge. It should offer a button to sync and close the currently filtered logged promotion tasks.
         </p>
       </section>
 
@@ -541,6 +576,34 @@ export default function ReviewTasksPage() {
                   ))}
                 </div>
               )}
+            </div>
+            <div className="card" style={{ marginTop: 14 }}>
+              <span className="pill">Promotion Actions</span>
+              <h3>Advance the filtered promotion cluster together</h3>
+              <p className="helperText" style={{ marginTop: 8 }}>
+                This action reuses the workbook bridge sync, then closes the currently filtered logged tasks so the board reflects that the cluster has moved forward.
+              </p>
+              <div className="inlineActions" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => void onBulkPromotionClose()}
+                  disabled={savingTaskId === -3 || closablePromotionTaskIds.length === 0}
+                >
+                  {savingTaskId === -3
+                    ? "Syncing and closing promotion tasks..."
+                    : `Sync and close filtered logged tasks${closablePromotionTaskIds.length ? ` (${closablePromotionTaskIds.length})` : ""}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromotionFilter("logged");
+                    setQaFilter("approved");
+                    setStatusFilter("");
+                  }}
+                >
+                  Focus logged promotion tasks
+                </button>
+              </div>
             </div>
             <p className="helperText">
               Workbook: <span className="monoText">{bridge.workbook_path}</span>

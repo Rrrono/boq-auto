@@ -258,6 +258,23 @@ Recent uncommitted work in the current checkpoint:
   - review-task API filtering now supports `focus_area` and `specialist_only`
   - the hosted reviewer page can now work the taxonomy backlog directly by clicking a backlog area
   - queue controls now support focus-area filtering, specialist-only filtering, and quick actions for promotion-ready or QA-ready work
+- the immediate next milestone after the promotion-pipeline board is to make that board operational:
+  - batch action(s) should move filtered promotion-ready clusters forward from the same page
+  - prefer reusing the existing workbook bridge sync path instead of adding a disconnected promotion pipeline
+  - the live UI should make the new action visually obvious so a redeploy check is easy to confirm
+- that operational promotion milestone is now in place:
+  - `POST /review-tasks/bulk/promotion/close` reuses the existing bridge sync, then closes the currently selected logged tasks
+  - this is intentionally scoped to QA-approved tasks already in `promotion_status=logged`
+  - the reviewer page now shows a `Phase 3.5 Milestone` card plus a `Promotion Actions` card under the Learning Bridge
+  - the clearest live-site check after redeploy is:
+    1. open `Review Tasks`
+    2. confirm the `Phase 3.5 Milestone` card is visible near the top
+    3. under `Learning Bridge`, confirm the `Promotion Actions` card is visible
+    4. confirm it contains a button labeled `Sync and close filtered logged tasks (...)`
+    5. clicking `Focus logged promotion tasks` should narrow the queue to approved/logged promotion work
+  - verification for this slice:
+    - `python -m pytest -q tests\test_job_api.py`
+    - `npm run build` in `web/`
   - this moves the backlog from a passive summary toward an operational triage surface
 - the next reviewer-operations slice now adds the first safe batch action:
   - `POST /review-tasks/bulk/claim` claims multiple filtered open tasks at once

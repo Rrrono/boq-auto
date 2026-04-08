@@ -14,6 +14,7 @@ from app.models.job import (
     ReviewTaskBacklogAreaResponse,
     ReviewTaskBridgeSummaryResponse,
     ReviewTaskBridgeSyncResponse,
+    ReviewTaskBulkPromotionResponse,
     ReviewTaskPromotionSummaryResponse,
     ReviewTaskReviewerSummaryResponse,
     ReviewTaskResponse,
@@ -706,3 +707,59 @@ def bulk_qa_review_tasks(
     requested_count = len(task_ids)
     skipped_count += max(0, requested_count - len(tasks))
     return updated, skipped_count
+
+
+def bulk_close_logged_review_tasks(
+    db: Session,
+    task_ids: list[int],
+    *,
+    reviewer_uid: str,
+    reviewer_email: str | None,
+) -> ReviewTaskBulkPromotionResponse:
+    requested_count = len(task_ids)
+    bridge_sync = sync_review_task_bridge(refresh_review_report=True)
+    if not task_ids:
+        return ReviewTaskBulkPromotionResponse(
+            requested_count=0,
+            updated_count=0,
+            skipped_count=0,
+            review_report_rows=bridge_sync.review_report_rows,
+            bridge=bridge_sync.bridge,
+            tasks=[],
+        )
+
+    tasks = list(
+        db.query(ReviewTask)
+        .filter(ReviewTask.id.in_(task_ids))
+        .order_by(ReviewTask.updated_at.desc(), ReviewTask.created_at.desc())
+        .all()
+    )
+    updated: list[ReviewTask] = []
+    skipped_count = 0
+    now = datetime.now(timezone.utc)
+
+    for task in tasks:
+        if task.promotion_status != "logged" or task.qa_status != "approved":
+            skipped_count += 1
+            continue
+        task.promotion_status = "closed"
+        note_parts = [task.qa_note.strip()] if task.qa_note.strip() else []
+        closer = (reviewer_email or task.qa_reviewer_email or task.reviewer_email or reviewer_uid).strip()
+        note_parts.append(f"Promotion cluster closed after bridge sync by {closer}.")
+        task.qa_note = " ".join(part for part in note_parts if part).strip()
+        task.updated_at = now
+        updated.append(task)
+
+    db.commit()
+    for task in updated:
+        db.refresh(task)
+
+    skipped_count += max(0, requested_count - len(tasks))
+    return ReviewTaskBulkPromotionResponse(
+        requested_count=requested_count,
+        updated_count=len(updated),
+        skipped_count=skipped_count,
+        review_report_rows=bridge_sync.review_report_rows,
+        bridge=bridge_sync.bridge,
+        tasks=[serialize_review_task(task) for task in updated],
+    )

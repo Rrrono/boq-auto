@@ -666,3 +666,89 @@ def test_review_task_bridge_summary_and_sync_endpoint(tmp_path) -> None:
     source_markers = [str(row[2] or "") for row in candidate_sheet.iter_rows(min_row=2, values_only=True)]
     assert "schema-task:task-rate-bridge" in source_markers
     assert "schema-task:task-alias-bridge" in source_markers
+
+
+def test_bulk_close_logged_review_tasks_syncs_bridge_and_closes_cluster(tmp_path) -> None:
+    schema_source = tmp_path / "runtime_master.xlsx"
+    _build_runtime_database(schema_source)
+    os.environ["BOQ_AUTO_API_DB_PATH"] = str(schema_source)
+    repository = CostDatabase(schema_source)
+    repository.initialize()
+
+    create_response = client.post("/jobs", json={"title": "Promotion Close Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    with SessionLocal() as db:
+        job_run = JobRun(
+            job_id=job_id,
+            run_type="price_boq",
+            status="completed",
+            processed=1,
+            matched=0,
+            flagged=1,
+            total_cost=0.0,
+            currency="KES",
+            output_storage_uri="",
+            audit_storage_uri="",
+            result_payload="{}",
+        )
+        db.add(job_run)
+        db.flush()
+        task = ReviewTask(
+            job_id=job_id,
+            job_run_id=job_run.id,
+            status="submitted",
+            source_row_key="BOQ:2:Crawler excavator hire",
+            sheet_name="BOQ",
+            row_number=2,
+            description="Crawler excavator hire",
+            matched_description="",
+            matched_item_code="",
+            task_type="specialist_rate_entry",
+            task_question="Enter a practical specialist rate.",
+            response_schema_json='["category_direction","manual_rate","reviewer_note"]',
+            unit="day",
+            decision="unmatched",
+            confidence_score=0.0,
+            confidence_band="very_low",
+            flag_reasons_json='["confidence_very_low"]',
+            reviewer_uid="local-dev",
+            reviewer_email="",
+            submitted_decision="manual_rate",
+            submitted_category_direction="plant_transport",
+            submitted_match_description="Crawler excavator hire",
+            submitted_rate=26500.0,
+            reviewer_note="Ready to move into promotion pipeline.",
+            qa_status="approved",
+            qa_reviewer_uid="local-dev",
+            qa_reviewer_email="",
+            qa_note="Approved and logged.",
+            promotion_target="rate_observation",
+            promotion_status="logged",
+        )
+        db.add(task)
+        db.commit()
+        task_id = task.id
+
+    repository.record_rate_observation(
+        "Crawler excavator hire",
+        "Crawler excavator hire",
+        "day",
+        26500.0,
+        source="review_task",
+        reviewer="local-dev",
+        metadata={"task_id": task_id, "section": "Dayworks", "region": "Nairobi"},
+    )
+
+    response = client.post(
+        "/review-tasks/bulk/promotion/close",
+        json={"task_ids": [task_id]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requested_count"] == 1
+    assert body["updated_count"] == 1
+    assert body["skipped_count"] == 0
+    assert body["review_report_rows"] >= 1
+    assert body["tasks"][0]["promotion_status"] == "closed"
+    assert body["bridge"]["synced_candidate_rows"] >= 1
