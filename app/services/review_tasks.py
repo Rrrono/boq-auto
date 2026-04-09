@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,7 +34,10 @@ def _row_key(item: dict) -> str:
     sheet_name = str(item.get("sheet_name") or "").strip()
     row_number = int(item.get("row_number") or 0)
     description = str(item.get("description") or "").strip()
-    return f"{sheet_name}:{row_number}:{description}".strip()
+    compact_sheet = sheet_name[:80]
+    compact_description = description[:120]
+    digest = hashlib.sha1(description.encode("utf-8", errors="ignore")).hexdigest()[:16]
+    return f"{compact_sheet}:{row_number}:{compact_description}:{digest}".strip()
 
 
 def _should_create_task(item: dict) -> bool:

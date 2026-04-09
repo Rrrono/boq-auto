@@ -333,6 +333,28 @@ Recent uncommitted work in the current checkpoint:
   - verification for this slice:
     - `python -m pytest -q tests\test_job_api.py`
     - `npm run build` in `web/`
+- runtime diagnosis of the persistent sync failure found the exact backend cause:
+  - Cloud Run logs show `sqlalchemy.exc.DataError` / `psycopg.errors.StringDataRightTruncation`
+  - the failure happens during `POST /jobs/{job_id}/review-tasks/sync`
+  - the most likely field is `review_tasks.source_row_key` (`varchar(255)`), because it was being built as `sheet_name:row_number:description`
+  - long BOQ descriptions can exceed that column length even when the rest of the workflow is correct
+  - the next fix should make `source_row_key` compact and deterministic for long descriptions rather than storing the raw description in full
+- that truncation fix is now in place:
+  - `source_row_key` is now compact and deterministic:
+    - truncated `sheet_name`
+    - `row_number`
+    - truncated `description`
+    - short SHA1 digest of the full description
+  - this preserves task identity/deduping without risking `varchar(255)` overflow on long BOQ lines
+  - a regression test now covers long-description sync success and asserts the stored `source_row_key` stays within 255 characters
+  - the clearest live-site check after redeploy is:
+    1. reopen the same long-description `Qardho` job
+    2. click `Generate review tasks`
+    3. confirm the job page no longer shows `Job action failed / Failed to fetch`
+    4. confirm the `Auto Review Sync` card shows counts and the reviewer-task preview appears
+  - verification for this slice:
+    - `python -m pytest -q tests\test_job_api.py`
+    - `npm run build` in `web/`
   - this moves the backlog from a passive summary toward an operational triage surface
 - the next reviewer-operations slice now adds the first safe batch action:
   - `POST /review-tasks/bulk/claim` claims multiple filtered open tasks at once

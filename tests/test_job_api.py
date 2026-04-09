@@ -51,6 +51,21 @@ def _build_specialist_gap_workbook_bytes() -> bytes:
     return stream.getvalue()
 
 
+def _build_long_description_workbook_bytes() -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "BOQ"
+    sheet.append(["Description", "Unit", "Quantity"])
+    sheet.append([
+        "Provide and maintain rented accommodation for Engineer's Senior Staff, including all utilities, insurance, standby arrangements, furnishings, transport support, temporary service diversions, and any other obligations instructed by the Engineer throughout the full duration of the contract works and all related defects liability periods",
+        "month",
+        12,
+    ])
+    stream = BytesIO()
+    workbook.save(stream)
+    return stream.getvalue()
+
+
 def _build_runtime_database(path: Path) -> None:
     workbook = Workbook()
     sheet = workbook.active
@@ -564,6 +579,25 @@ def test_review_tasks_can_be_filtered_by_job_id() -> None:
     tasks = response.json()
     assert tasks
     assert all(task["job_id"] == first_job for task in tasks)
+
+
+def test_long_description_rows_sync_without_source_row_key_overflow() -> None:
+    create_response = client.post("/jobs", json={"title": "Long Row Key Job", "region": "Nairobi"})
+    job_id = create_response.json()["id"]
+
+    client.post(
+        f"/jobs/{job_id}/files",
+        data={"file_type": "boq"},
+        files={"file": ("long.xlsx", _build_long_description_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    client.post(f"/jobs/{job_id}/price-boq")
+
+    sync_response = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    assert sync_response.status_code == 200
+    body = sync_response.json()
+    assert body["eligible_count"] >= 1
+    assert body["tasks"]
+    assert len(body["tasks"][0]["source_row_key"]) <= 255
 
 
 def test_category_direction_submission_is_persisted_and_promoted(tmp_path) -> None:
