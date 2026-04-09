@@ -202,7 +202,7 @@ export default function JobDetailPage() {
       setReviewTaskSyncSummary(sync);
       if (sync.eligible_count > 0) {
         setNotice(
-          `Pricing run completed and ${sync.created_count} review tasks were created (${sync.refreshed_count} refreshed, ${sync.eligible_count} eligible weak rows).`,
+          `Pricing run completed and ${sync.created_count} review tasks were created (${sync.refreshed_count} refreshed, ${sync.eligible_count} eligible weak rows). Showing ${sync.preview_count} of ${sync.total_task_count} tasks in this workspace preview.`,
         );
       } else {
         setNotice("Pricing run completed. No review tasks were eligible from the latest run.");
@@ -228,7 +228,7 @@ export default function JobDetailPage() {
       setReviewTaskSyncSummary(response);
       setNotice(
         response.eligible_count > 0
-          ? `Reviewer sync published ${response.created_count} tasks and refreshed ${response.refreshed_count} more from ${response.eligible_count} eligible weak rows.`
+          ? `Reviewer sync published ${response.created_count} tasks and refreshed ${response.refreshed_count} more from ${response.eligible_count} eligible weak rows. Showing ${response.preview_count} of ${response.total_task_count} tasks in this workspace preview.`
           : "No review tasks were eligible from the latest run.",
       );
     } catch (error) {
@@ -480,6 +480,10 @@ export default function JobDetailPage() {
                 <strong>Open tasks for this run</strong>
                 <span>{reviewTaskSyncSummary.open_count}</span>
               </div>
+              <div className="metaRow">
+                <strong>Preview rows shown here</strong>
+                <span>{reviewTaskSyncSummary.preview_count} of {reviewTaskSyncSummary.total_task_count}</span>
+              </div>
             </div>
           ) : (
             <p className="helperText" style={{ marginTop: 10 }}>
@@ -492,6 +496,10 @@ export default function JobDetailPage() {
         ) : reviewTasks.length === 0 ? (
           <div className="emptyState">No review tasks synced for this job yet.</div>
         ) : (
+          <>
+          <p className="helperText" style={{ marginTop: 10 }}>
+            Showing {reviewTasks.length} reviewer-task preview rows in this workspace. Use <Link href="/review-tasks">Review Tasks</Link> for the full queue.
+          </p>
           <div className="tableWrap">
             <table>
               <thead>
@@ -518,6 +526,7 @@ export default function JobDetailPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
         <p className="helperText">
           This queue is the bridge to the next learning phase: reviewers claim uncertain rows, submit structured corrections, and feed a future promotion workflow.

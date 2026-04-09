@@ -102,6 +102,8 @@ class ReviewTaskSyncResponse(BaseModel):
     created_count: int = 0
     refreshed_count: int = 0
     open_count: int
+    total_task_count: int = 0
+    preview_count: int = 0
     tasks: list[ReviewTaskResponse] = Field(default_factory=list)
 
 

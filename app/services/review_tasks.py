@@ -26,6 +26,8 @@ from src.ingestion import candidate_positions, generate_review_report, sync_revi
 from app.services.cost_engine import resolve_runtime_database_paths
 from openpyxl import load_workbook
 
+REVIEW_TASK_SYNC_PREVIEW_LIMIT = 25
+
 
 def _row_key(item: dict) -> str:
     sheet_name = str(item.get("sheet_name") or "").strip()
@@ -203,7 +205,17 @@ def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
 def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
     latest_run = next(iter(sorted(job.runs, key=lambda item: item.created_at, reverse=True)), None)
     if latest_run is None:
-        return ReviewTaskSyncResponse(job_id=job.id, synced_count=0, eligible_count=0, created_count=0, refreshed_count=0, open_count=0, tasks=[])
+        return ReviewTaskSyncResponse(
+            job_id=job.id,
+            synced_count=0,
+            eligible_count=0,
+            created_count=0,
+            refreshed_count=0,
+            open_count=0,
+            total_task_count=0,
+            preview_count=0,
+            tasks=[],
+        )
 
     payload = json.loads(latest_run.result_payload or "{}")
     items = payload.get("items", [])
@@ -261,6 +273,7 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
         .all()
     )
     open_count = sum(1 for task in tasks if task.status != "submitted")
+    preview_tasks = tasks[:REVIEW_TASK_SYNC_PREVIEW_LIMIT]
     return ReviewTaskSyncResponse(
         job_id=job.id,
         synced_count=synced_count,
@@ -268,7 +281,9 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
         created_count=created_count,
         refreshed_count=refreshed_count,
         open_count=open_count,
-        tasks=[serialize_review_task(task) for task in tasks],
+        total_task_count=len(tasks),
+        preview_count=len(preview_tasks),
+        tasks=[serialize_review_task(task) for task in preview_tasks],
     )
 
 

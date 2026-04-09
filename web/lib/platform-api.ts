@@ -171,6 +171,8 @@ export type ReviewTaskSyncResponse = {
   created_count: number;
   refreshed_count: number;
   open_count: number;
+  total_task_count: number;
+  preview_count: number;
   tasks: ReviewTask[];
 };
 

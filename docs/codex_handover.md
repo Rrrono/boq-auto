@@ -294,6 +294,24 @@ Recent uncommitted work in the current checkpoint:
   - verification for this slice:
     - `python -m pytest -q tests\test_job_api.py`
     - `npm run build` in `web/`
+- live testing on a very review-heavy BOQ exposed a follow-on issue:
+  - the job page can still hit `Failed to fetch` when auto-syncing reviewer tasks for a run with hundreds of weak rows
+  - likely cause: the sync endpoint currently returns the full per-job task list, which is too heavy for this workflow
+  - the next fix should keep the counts but return only a lightweight preview of synced tasks to the job page
+  - the job page should make it explicit that it is showing only a preview and that the full queue lives in `Review Tasks`
+- that lightweight sync-preview fix is now in place:
+  - `ReviewTaskSyncResponse` now includes `total_task_count` and `preview_count`
+  - the sync endpoint now returns only a capped preview task list instead of the full per-job queue
+  - the job page notices now explicitly say that the workspace is showing only a preview
+  - the `Auto Review Sync` card now shows `Preview rows shown here`
+  - the clearest live-site check after redeploy is:
+    1. price or sync a very review-heavy BOQ
+    2. confirm the success notice says `Showing X of Y tasks in this workspace preview`
+    3. confirm the `Auto Review Sync` card shows `Preview rows shown here`
+    4. confirm the reviewer-task table also says it is only a workspace preview and links to `Review Tasks`
+  - verification for this slice:
+    - `python -m pytest -q tests\test_job_api.py`
+    - `npm run build` in `web/`
   - this moves the backlog from a passive summary toward an operational triage surface
 - the next reviewer-operations slice now adds the first safe batch action:
   - `POST /review-tasks/bulk/claim` claims multiple filtered open tasks at once
