@@ -341,7 +341,7 @@ export async function getKnowledgeQueue(limit = 50, token?: string | null): Prom
 }
 
 export async function listReviewTasks(
-  options?: { status?: string; qa_status?: string; promotion_status?: string; focus_area?: string; specialist_only?: boolean; mine?: boolean },
+  options?: { status?: string; qa_status?: string; promotion_status?: string; focus_area?: string; job_id?: string; specialist_only?: boolean; mine?: boolean },
   token?: string | null,
 ): Promise<ReviewTask[]> {
   const params = new URLSearchParams();
@@ -356,6 +356,9 @@ export async function listReviewTasks(
   }
   if (options?.focus_area) {
     params.set("focus_area", options.focus_area);
+  }
+  if (options?.job_id) {
+    params.set("job_id", options.job_id);
   }
   if (options?.specialist_only) {
     params.set("specialist_only", "true");

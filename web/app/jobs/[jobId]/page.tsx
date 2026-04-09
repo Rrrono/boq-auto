@@ -60,7 +60,7 @@ export default function JobDetailPage() {
           getJob(jobId, token),
           getJobResults(jobId, token).catch(() => null),
         ]);
-        const nextTasks = await listReviewTasks({}, token).then((items) => items.filter((item) => item.job_id === jobId));
+        const nextTasks = await listReviewTasks({ job_id: jobId }, token);
         if (!cancelled) {
           setJob(nextJob);
           setPricing(nextPricing);
@@ -144,7 +144,7 @@ export default function JobDetailPage() {
         getJob(jobId, token),
         getJobResults(jobId, token).catch(() => null),
       ]);
-      const nextTasks = await listReviewTasks({}, token).then((items) => items.filter((item) => item.job_id === jobId));
+      const nextTasks = await listReviewTasks({ job_id: jobId }, token);
       setJob(nextJob);
       setPricing(nextPricing);
       setReviewTasks(nextTasks);

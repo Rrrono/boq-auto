@@ -47,13 +47,14 @@ def list_review_tasks_endpoint(
     qa_status: str | None = Query(default=None),
     promotion_status: str | None = Query(default=None),
     focus_area: str | None = Query(default=None),
+    job_id: str | None = Query(default=None),
     specialist_only: bool = Query(default=False),
     mine: bool = Query(default=False),
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> list[ReviewTaskResponse]:
     reviewer_uid = user.uid if mine else None
-    tasks = list_review_tasks(db, status=status, reviewer_uid=reviewer_uid)
+    tasks = list_review_tasks(db, status=status, reviewer_uid=reviewer_uid, job_id=job_id)
     serialized = [serialize_review_task(task) for task in tasks]
     if qa_status:
         serialized = [task for task in serialized if task.qa_status == qa_status]

@@ -224,6 +224,14 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
     created_count = 0
     refreshed_count = 0
     now = datetime.now(timezone.utc)
+    existing_tasks = {
+        task.source_row_key: task
+        for task in (
+            db.query(ReviewTask)
+            .filter(ReviewTask.job_run_id == latest_run.id)
+            .all()
+        )
+    }
 
     for item in items:
         if not isinstance(item, dict) or not _should_create_task(item):
@@ -234,11 +242,7 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
         if not source_row_key:
             continue
 
-        task = (
-            db.query(ReviewTask)
-            .filter(ReviewTask.job_run_id == latest_run.id, ReviewTask.source_row_key == source_row_key)
-            .first()
-        )
+        task = existing_tasks.get(source_row_key)
         if task is None:
             task = ReviewTask(
                 job_id=job.id,
@@ -247,6 +251,7 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
             )
             db.add(task)
             task.status = "open"
+            existing_tasks[source_row_key] = task
             created_count += 1
         else:
             refreshed_count += 1
@@ -287,12 +292,20 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
     )
 
 
-def list_review_tasks(db: Session, *, status: str | None = None, reviewer_uid: str | None = None) -> list[ReviewTask]:
+def list_review_tasks(
+    db: Session,
+    *,
+    status: str | None = None,
+    reviewer_uid: str | None = None,
+    job_id: str | None = None,
+) -> list[ReviewTask]:
     query = db.query(ReviewTask).order_by(ReviewTask.updated_at.desc(), ReviewTask.created_at.desc())
     if status:
         query = query.filter(ReviewTask.status == status)
     if reviewer_uid:
         query = query.filter(ReviewTask.reviewer_uid == reviewer_uid)
+    if job_id:
+        query = query.filter(ReviewTask.job_id == job_id)
     return list(query.all())
 
 

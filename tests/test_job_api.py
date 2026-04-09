@@ -546,6 +546,26 @@ def test_specialist_gap_rows_create_specialist_task_types() -> None:
     assert all(task["focus_area"] == "survey" or task["submitted_category_direction"] == "survey" for task in filtered_tasks)
 
 
+def test_review_tasks_can_be_filtered_by_job_id() -> None:
+    first_job = client.post("/jobs", json={"title": "Filter A", "region": "Nairobi"}).json()["id"]
+    second_job = client.post("/jobs", json={"title": "Filter B", "region": "Nairobi"}).json()["id"]
+
+    for job_id, filename in ((first_job, "a.xlsx"), (second_job, "b.xlsx")):
+        client.post(
+            f"/jobs/{job_id}/files",
+            data={"file_type": "boq"},
+            files={"file": (filename, _build_unmatched_workbook_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        client.post(f"/jobs/{job_id}/price-boq")
+        client.post(f"/jobs/{job_id}/review-tasks/sync")
+
+    response = client.get("/review-tasks", params={"job_id": first_job})
+    assert response.status_code == 200
+    tasks = response.json()
+    assert tasks
+    assert all(task["job_id"] == first_job for task in tasks)
+
+
 def test_category_direction_submission_is_persisted_and_promoted(tmp_path) -> None:
     schema_source = tmp_path / "runtime_master.xlsx"
     _build_runtime_database(schema_source)

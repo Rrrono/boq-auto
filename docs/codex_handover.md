@@ -312,6 +312,27 @@ Recent uncommitted work in the current checkpoint:
   - verification for this slice:
     - `python -m pytest -q tests\test_job_api.py`
     - `npm run build` in `web/`
+- live follow-up showed the heavy-job fetch problem can still persist:
+  - even after trimming the sync response, a very review-heavy job may still hit `Failed to fetch`
+  - the next likely scaling causes are:
+    1. the job page still loads review tasks by fetching the full queue and filtering client-side
+    2. `sync_review_tasks_for_job()` still does per-row task lookups, which is inefficient on large runs
+  - the next fix should:
+    - add server-side `job_id` filtering on `/review-tasks`
+    - switch the job page to that filtered query
+    - preload existing tasks by `source_row_key` during sync so large runs avoid N+1 query behavior
+- that job-level scaling fix is now in place:
+  - `/review-tasks` now supports `job_id`
+  - the job page now fetches only the tasks for the current job instead of loading the whole queue and filtering client-side
+  - `sync_review_tasks_for_job()` now preloads existing tasks for the run by `source_row_key` instead of querying one row at a time
+  - the clearest live-site check after redeploy is:
+    1. open a very review-heavy job like `Qardho`
+    2. run pricing or click `Generate review tasks`
+    3. confirm the job page no longer throws `Failed to fetch`
+    4. confirm the `Auto Review Sync` card shows counts and the reviewer-task preview appears
+  - verification for this slice:
+    - `python -m pytest -q tests\test_job_api.py`
+    - `npm run build` in `web/`
   - this moves the backlog from a passive summary toward an operational triage surface
 - the next reviewer-operations slice now adds the first safe batch action:
   - `POST /review-tasks/bulk/claim` claims multiple filtered open tasks at once
