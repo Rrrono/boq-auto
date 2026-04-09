@@ -9,6 +9,7 @@ import {
   type Job,
   type PricingResult,
   type ReviewTask,
+  type ReviewTaskSyncResponse,
   getErrorMessage,
   getJob,
   getJobResults,
@@ -40,6 +41,7 @@ export default function JobDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [pricingRunBusy, setPricingRunBusy] = useState(false);
   const [reviewTasks, setReviewTasks] = useState<ReviewTask[]>([]);
+  const [reviewTaskSyncSummary, setReviewTaskSyncSummary] = useState<ReviewTaskSyncResponse | null>(null);
   const [syncingTasks, setSyncingTasks] = useState(false);
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export default function JobDetailPage() {
           setJob(nextJob);
           setPricing(nextPricing);
           setReviewTasks(nextTasks);
+          setReviewTaskSyncSummary(null);
         }
       } catch (error) {
         if (!cancelled) {
@@ -145,6 +148,7 @@ export default function JobDetailPage() {
       setJob(nextJob);
       setPricing(nextPricing);
       setReviewTasks(nextTasks);
+      setReviewTaskSyncSummary(null);
     } catch (error) {
       setJob(null);
       setPricing(null);
@@ -193,7 +197,16 @@ export default function JobDetailPage() {
       const response = await priceJob(jobId, token);
       setJob(response.job);
       setPricing(response.pricing);
-      setNotice("Pricing run completed.");
+      const sync = await syncReviewTasks(jobId, token);
+      setReviewTasks(sync.tasks);
+      setReviewTaskSyncSummary(sync);
+      if (sync.eligible_count > 0) {
+        setNotice(
+          `Pricing run completed and ${sync.created_count} review tasks were created (${sync.refreshed_count} refreshed, ${sync.eligible_count} eligible weak rows).`,
+        );
+      } else {
+        setNotice("Pricing run completed. No review tasks were eligible from the latest run.");
+      }
     } catch (error) {
       setActionError(getErrorMessage(error, "Pricing could not start for this job."));
     } finally {
@@ -212,10 +225,11 @@ export default function JobDetailPage() {
       const token = await getIdToken();
       const response = await syncReviewTasks(jobId, token);
       setReviewTasks(response.tasks);
+      setReviewTaskSyncSummary(response);
       setNotice(
-        response.synced_count > 0
-          ? `Created or refreshed ${response.synced_count} review tasks from the latest pricing run.`
-          : "No review tasks were generated from the latest run.",
+        response.eligible_count > 0
+          ? `Reviewer sync published ${response.created_count} tasks and refreshed ${response.refreshed_count} more from ${response.eligible_count} eligible weak rows.`
+          : "No review tasks were eligible from the latest run.",
       );
     } catch (error) {
       setActionError(getErrorMessage(error, "Review tasks could not be generated for this job."));
@@ -441,6 +455,37 @@ export default function JobDetailPage() {
               Open reviewer inbox
             </Link>
           </div>
+        </div>
+        <div className="card" style={{ marginTop: 12, borderColor: "color-mix(in srgb, var(--accent) 26%, transparent)" }}>
+          <span className="pill">Auto Review Sync</span>
+          <h3>Review-heavy pricing now reports reviewer-task publishing clearly.</h3>
+          <p className="helperText" style={{ marginTop: 8 }}>
+            After redeploy, pricing or syncing this job should show how many weak rows were eligible for reviewer work and how many tasks were created or refreshed.
+          </p>
+          {reviewTaskSyncSummary ? (
+            <div className="metaGrid" style={{ marginTop: 12 }}>
+              <div className="metaRow">
+                <strong>Eligible weak rows</strong>
+                <span>{reviewTaskSyncSummary.eligible_count}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Created tasks</strong>
+                <span>{reviewTaskSyncSummary.created_count}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Refreshed tasks</strong>
+                <span>{reviewTaskSyncSummary.refreshed_count}</span>
+              </div>
+              <div className="metaRow">
+                <strong>Open tasks for this run</strong>
+                <span>{reviewTaskSyncSummary.open_count}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="helperText" style={{ marginTop: 10 }}>
+              Run pricing or generate review tasks to populate explicit sync counts for this job.
+            </p>
+          )}
         </div>
         {!pricing ? (
           <div className="emptyState">Run pricing first, then generate review tasks from the flagged and unmatched rows.</div>

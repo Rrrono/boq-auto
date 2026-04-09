@@ -167,6 +167,9 @@ export type ReviewTask = {
 export type ReviewTaskSyncResponse = {
   job_id: string;
   synced_count: number;
+  eligible_count: number;
+  created_count: number;
+  refreshed_count: number;
   open_count: number;
   tasks: ReviewTask[];
 };

@@ -203,16 +203,20 @@ def serialize_review_task(task: ReviewTask) -> ReviewTaskResponse:
 def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
     latest_run = next(iter(sorted(job.runs, key=lambda item: item.created_at, reverse=True)), None)
     if latest_run is None:
-        return ReviewTaskSyncResponse(job_id=job.id, synced_count=0, open_count=0, tasks=[])
+        return ReviewTaskSyncResponse(job_id=job.id, synced_count=0, eligible_count=0, created_count=0, refreshed_count=0, open_count=0, tasks=[])
 
     payload = json.loads(latest_run.result_payload or "{}")
     items = payload.get("items", [])
     synced_count = 0
+    eligible_count = 0
+    created_count = 0
+    refreshed_count = 0
     now = datetime.now(timezone.utc)
 
     for item in items:
         if not isinstance(item, dict) or not _should_create_task(item):
             continue
+        eligible_count += 1
 
         source_row_key = _row_key(item)
         if not source_row_key:
@@ -231,6 +235,9 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
             )
             db.add(task)
             task.status = "open"
+            created_count += 1
+        else:
+            refreshed_count += 1
         task.sheet_name = str(item.get("sheet_name") or "")
         task.row_number = int(item.get("row_number") or 0)
         task.description = str(item.get("description") or "")
@@ -257,6 +264,9 @@ def sync_review_tasks_for_job(db: Session, job: Job) -> ReviewTaskSyncResponse:
     return ReviewTaskSyncResponse(
         job_id=job.id,
         synced_count=synced_count,
+        eligible_count=eligible_count,
+        created_count=created_count,
+        refreshed_count=refreshed_count,
         open_count=open_count,
         tasks=[serialize_review_task(task) for task in tasks],
     )

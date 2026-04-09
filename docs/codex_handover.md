@@ -275,6 +275,25 @@ Recent uncommitted work in the current checkpoint:
   - verification for this slice:
     - `python -m pytest -q tests\test_job_api.py`
     - `npm run build` in `web/`
+- the next immediate UX hardening item is job-workspace review-task clarity:
+  - live user testing showed a review-heavy job page with 880 flagged rows but no obvious reviewer tasks afterward
+  - even when the sync action is working, the workflow is too opaque
+  - the next slice should:
+    1. return explicit sync counts from the backend (`eligible`, `created`, `refreshed`)
+    2. auto-sync reviewer tasks right after pricing in the job workspace
+    3. show a clear notice and card on the job page explaining how many review tasks were published
+- that job-workspace sync clarity milestone is now in place:
+  - `ReviewTaskSyncResponse` now returns `eligible_count`, `created_count`, and `refreshed_count`
+  - the job page now auto-syncs reviewer tasks immediately after pricing completes
+  - the job page now shows an obvious `Auto Review Sync` card under the `Reviewer Tasks` section
+  - the clearest live-site check after redeploy is:
+    1. price a review-heavy job
+    2. confirm the success notice explicitly mentions created/refreshed review-task counts
+    3. confirm the `Auto Review Sync` card appears on the job page
+    4. confirm that card shows `Eligible weak rows`, `Created tasks`, `Refreshed tasks`, and `Open tasks for this run`
+  - verification for this slice:
+    - `python -m pytest -q tests\test_job_api.py`
+    - `npm run build` in `web/`
   - this moves the backlog from a passive summary toward an operational triage surface
 - the next reviewer-operations slice now adds the first safe batch action:
   - `POST /review-tasks/bulk/claim` claims multiple filtered open tasks at once

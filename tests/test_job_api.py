@@ -171,6 +171,9 @@ def test_sync_claim_and_submit_review_tasks() -> None:
     assert sync_response.status_code == 200
     sync_body = sync_response.json()
     assert sync_body["job_id"] == job_id
+    assert sync_body["eligible_count"] >= 1
+    assert sync_body["created_count"] >= 1
+    assert sync_body["refreshed_count"] == 0
     assert "tasks" in sync_body
     assert sync_body["tasks"][0]["task_type"] in {"candidate_selection", "match_confirmation", "manual_rate_entry", "category_classification", "section_alignment", "specialist_classification", "specialist_rate_entry"}
     assert sync_body["tasks"][0]["task_question"]
@@ -204,6 +207,13 @@ def test_sync_claim_and_submit_review_tasks() -> None:
     assert submitted["status"] == "submitted"
     assert submitted["submitted_decision"] == "manual_rate"
     assert submitted["submitted_rate"] == 1250.0
+
+    second_sync = client.post(f"/jobs/{job_id}/review-tasks/sync")
+    assert second_sync.status_code == 200
+    second_body = second_sync.json()
+    assert second_body["eligible_count"] >= 1
+    assert second_body["created_count"] == 0
+    assert second_body["refreshed_count"] >= 1
 
 
 def test_review_task_cannot_be_claimed_or_submitted_twice() -> None:

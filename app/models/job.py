@@ -98,6 +98,9 @@ class ReviewTaskResponse(BaseModel):
 class ReviewTaskSyncResponse(BaseModel):
     job_id: str
     synced_count: int
+    eligible_count: int = 0
+    created_count: int = 0
+    refreshed_count: int = 0
     open_count: int
     tasks: list[ReviewTaskResponse] = Field(default_factory=list)
 
